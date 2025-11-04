@@ -15,19 +15,21 @@ async function handleResponse<T>(response: Response): Promise<T> {
   return data;
 }
 
+type CreatePubResponse = { id: number } | { error: string };
+
 export const api = {
   airports: async (q: string) => {
     const response = await fetch(`${BASE}/airports?q=${encodeURIComponent(q)}`);
     return handleResponse(response);
   },
 
-  createPub: async (body: any) => {
+  createPub: async (body: any): Promise<CreatePubResponse> => {
     const response = await fetch(`${BASE}/publications`, {
       method: "POST",
       headers: { "Content-Type": "application/json", ...tgHeader() },
       body: JSON.stringify(body),
     });
-    return handleResponse(response);
+    return handleResponse<CreatePubResponse>(response);
   },
 
   listPubs: async (from: string, to: string, kind?: string) => {
