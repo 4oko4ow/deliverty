@@ -198,19 +198,47 @@ func createDeal(pool *pgxpool.Pool) gin.HandlerFunc {
 			encodedStart := url.QueryEscape(startParam)
 			link := fmt.Sprintf("https://t.me/%s?start=%s", botName, encodedStart)
 
-			msg := fmt.Sprintf("✅ Создана новая сделка!\n\nНажмите на ссылку, чтобы начать общение:\n%s\n\nИли отправьте команду:\n/start %s", link, startParam)
+			msg := fmt.Sprintf("✅ Создана новая сделка!\n\nНажмите кнопку ниже, чтобы начать общение с другим участником.")
 
-			// Send to both participants
+			// Create inline keyboard with button that triggers the /start command via callback
+			// Use callback_data to handle the button click
+			keyboard := gin.H{
+				"inline_keyboard": [][]gin.H{
+					{
+						{
+							"text":         "Начать общение",
+							"callback_data": fmt.Sprintf("start_deal:%s", startParam),
+						},
+					},
+					{
+						{
+							"text": "Открыть ссылку",
+							"url":  link,
+						},
+					},
+				},
+			}
+
+			// Send to both participants (avoid duplicate if same user)
 			if reqTG != 0 {
-				_, err := tg.API("sendMessage", gin.H{"chat_id": reqTG, "text": msg})
+				_, err := tg.API("sendMessage", gin.H{
+					"chat_id":      reqTG,
+					"text":         msg,
+					"reply_markup": keyboard,
+				})
 				if err != nil {
 					log.Printf("[DEAL] Failed to send message to request user %d: %v", reqTG, err)
 				} else {
 					log.Printf("[DEAL] Sent notification to request user %d for deal %d", reqTG, dealID)
 				}
 			}
-			if tripTG != 0 {
-				_, err := tg.API("sendMessage", gin.H{"chat_id": tripTG, "text": msg})
+			// Only send to trip user if different from request user
+			if tripTG != 0 && tripTG != reqTG {
+				_, err := tg.API("sendMessage", gin.H{
+					"chat_id":      tripTG,
+					"text":         msg,
+					"reply_markup": keyboard,
+				})
 				if err != nil {
 					log.Printf("[DEAL] Failed to send message to trip user %d: %v", tripTG, err)
 				} else {

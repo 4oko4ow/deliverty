@@ -235,21 +235,6 @@ export default function MatchesPage() {
               </div>
             )}
 
-            {/* Action button for creating counter publication */}
-            <div className="mt-4 pt-4 border-t border-gray-100">
-              <button
-                onClick={() => {
-                  // Navigate to publish page with pre-filled data
-                  // Same route, opposite kind (request ↔ trip)
-                  const oppositeKind = pub.kind === "request" ? "trip" : "request";
-                  navigate(`/publish?kind=${oppositeKind}&from=${pub.from_iata}&to=${pub.to_iata}&date_start=${pub.date_start}&date_end=${pub.date_end}`);
-                }}
-                className="btn btn-secondary w-full"
-              >
-                <HiOutlinePaperAirplane className="w-4 h-4" />
-                {pub.kind === "request" ? "Я лечу по этому маршруту" : "Мне нужно что-то передать"}
-              </button>
-            </div>
           </div>
 
           {/* Show matches or no matches message */}
@@ -277,10 +262,16 @@ export default function MatchesPage() {
                   Вернуться к поиску
                 </button>
                 <button
-                  onClick={() => navigate("/publish")}
+                  onClick={() => {
+                    // Navigate to publish page with pre-filled data
+                    // Same route, opposite kind (request ↔ trip)
+                    const oppositeKind = pub.kind === "request" ? "trip" : "request";
+                    navigate(`/publish?kind=${oppositeKind}&from=${pub.from_iata}&to=${pub.to_iata}&date_start=${pub.date_start}&date_end=${pub.date_end}`);
+                  }}
                   className="btn btn-primary"
                 >
-                  Создать новое объявление
+                  <HiOutlinePaperAirplane className="w-4 h-4" />
+                  {pub.kind === "request" ? "Я лечу по этому маршруту" : "Мне нужно что-то передать"}
                 </button>
               </div>
             </div>

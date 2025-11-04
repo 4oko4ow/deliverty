@@ -12,8 +12,6 @@ export default function BrowsePage() {
   const [to, setTo] = useState("");
   const [kindFilter, setKindFilter] = useState<"request" | "trip">("request");
   const [rows, setRows] = useState<any[]>([]);
-  const [matchesMap, setMatchesMap] = useState<Record<number, any[]>>({});
-  const [loadingMatches, setLoadingMatches] = useState<Record<number, boolean>>({});
   const [loading, setLoading] = useState(false);
   const [searched, setSearched] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -26,7 +24,6 @@ export default function BrowsePage() {
     setError(null);
     setLoading(true);
     setSearched(true);
-    setMatchesMap({});
     try {
       // Если выбран конкретный тип, ищем противоположный (совпадения)
       // Если kindFilter "all", не задаем searchKind - покажем все
@@ -41,10 +38,7 @@ export default function BrowsePage() {
       const result: any = await api.listPubs(from, to, searchKind);
       if (Array.isArray(result)) {
         setRows(result);
-        // Загружаем совпадения для каждого результата
-        if (result.length > 0) {
-          loadMatchesForResults(result);
-        }
+        // Не загружаем совпадения на странице поиска - они будут показаны на странице детального просмотра
       } else if (result && typeof result === "object" && "error" in result) {
         setError(result.error || "Ошибка при поиске");
         setRows([]);
@@ -59,29 +53,7 @@ export default function BrowsePage() {
     }
   }
 
-  async function loadMatchesForResults(results: any[]) {
-    const loadingState: Record<number, boolean> = {};
-    results.forEach(r => {
-      loadingState[r.id] = true;
-    });
-    setLoadingMatches(loadingState);
 
-    // Загружаем совпадения для каждого результата параллельно
-    const matchesPromises = results.map(r => api.matches(String(r.id)));
-    const matchesResults = await Promise.all(matchesPromises);
-
-    const newMatchesMap: Record<number, any[]> = {};
-    results.forEach((r, idx) => {
-      if (Array.isArray(matchesResults[idx])) {
-        newMatchesMap[r.id] = matchesResults[idx];
-      } else {
-        newMatchesMap[r.id] = [];
-      }
-    });
-
-    setMatchesMap(newMatchesMap);
-    setLoadingMatches({});
-  }
 
   const formatDate = (dateStr: string) => {
     if (!dateStr) return "";
@@ -260,55 +232,9 @@ export default function BrowsePage() {
                       </div>
                     </div>
 
-                    {/* Show matches if available */}
-                    {matchesMap[r.id] !== undefined && (
-                      <div className="mt-4 pt-4 border-t border-gray-100">
-                        {loadingMatches[r.id] ? (
-                          <div className="flex items-center gap-2 text-xs text-gray-500">
-                            <div className="w-3 h-3 border-2 border-primary-200 border-t-primary-600 rounded-full animate-spin" />
-                            Поиск совпадений...
-                          </div>
-                        ) : matchesMap[r.id] && matchesMap[r.id].length > 0 ? (
-                          <div className="space-y-2">
-                            <div className="flex items-center gap-2 text-xs font-medium text-gray-700">
-                              <HiOutlineSparkles className="w-4 h-4 text-primary-600" />
-                              Найдено {matchesMap[r.id].length} {matchesMap[r.id].length === 1 ? "совпадение" : matchesMap[r.id].length < 5 ? "совпадения" : "совпадений"}
-                            </div>
-                            <div className="space-y-2">
-                              {matchesMap[r.id].slice(0, 2).map((match: any) => (
-                                <div key={match.other_pub_id} className="p-2 bg-gray-50 rounded-lg text-xs">
-                                  <div className="flex items-center gap-2 mb-1">
-                                    {match.kind === "request" ? (
-                                      <span className="badge-primary text-xs px-1.5 py-0.5">
-                                        <HiOutlineGift className="w-3 h-3" />
-                                        <span>Ищу кто летит</span>
-                                      </span>
-                                    ) : (
-                                      <span className="badge-success text-xs px-1.5 py-0.5">
-                                        <HiOutlineTruck className="w-3 h-3" />
-                                        <span>Лечу</span>
-                                      </span>
-                                    )}
-                                    <span className="text-primary-600 font-semibold">{match.score}%</span>
-                                  </div>
-                                  <div className="text-gray-600">
-                                    {formatDate(match.date_start)} – {formatDate(match.date_end)}
-                                  </div>
-                                </div>
-                              ))}
-                            </div>
-                          </div>
-                        ) : (
-                          <div className="text-xs text-gray-500">
-                            Совпадений по датам не найдено
-                          </div>
-                        )}
-                      </div>
-                    )}
-
                     <div className="flex items-center justify-between pt-4 border-t border-gray-100 mt-4">
                       <span className="text-xs sm:text-sm text-gray-500">
-                        Открыть детали
+                        Открыть, чтобы увидеть совпадения
                       </span>
                       <button
                         className="btn btn-primary text-xs sm:text-sm px-3 py-2"
@@ -317,7 +243,7 @@ export default function BrowsePage() {
                           navigate(`/matches/${r.id}`);
                         }}
                       >
-                        Детали
+                        Совпадения
                         <HiArrowRight className="w-4 h-4 ml-1" />
                       </button>
                     </div>
