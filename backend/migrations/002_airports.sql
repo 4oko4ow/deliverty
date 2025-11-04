@@ -9,9 +9,18 @@ CREATE TABLE airport (
 );
 
 -- Optional: keep referential integrity (skip if you want flexibility during MVP)
-ALTER TABLE publication
-  ADD CONSTRAINT fk_pub_from FOREIGN KEY (from_iata) REFERENCES airport(iata),
-  ADD CONSTRAINT fk_pub_to   FOREIGN KEY (to_iata)   REFERENCES airport(iata);
+-- Only add constraints if publication table exists and constraints don't exist yet
+DO $$
+BEGIN
+  IF EXISTS (SELECT FROM information_schema.tables WHERE table_name = 'publication') THEN
+    IF NOT EXISTS (SELECT FROM information_schema.table_constraints WHERE constraint_name = 'fk_pub_from') THEN
+      ALTER TABLE publication ADD CONSTRAINT fk_pub_from FOREIGN KEY (from_iata) REFERENCES airport(iata);
+    END IF;
+    IF NOT EXISTS (SELECT FROM information_schema.table_constraints WHERE constraint_name = 'fk_pub_to') THEN
+      ALTER TABLE publication ADD CONSTRAINT fk_pub_to FOREIGN KEY (to_iata) REFERENCES airport(iata);
+    END IF;
+  END IF;
+END $$;
 
 -- Minimal seed (replace with full CSV later)
 INSERT INTO airport (iata, name, city, country, tz) VALUES

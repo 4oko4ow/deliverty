@@ -12,6 +12,7 @@ export default function MatchesPage() {
   const [rows, setRows] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [creating, setCreating] = useState<number | null>(null);
+  const [createdDeals, setCreatedDeals] = useState<Set<number>>(new Set());
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
@@ -62,7 +63,9 @@ export default function MatchesPage() {
   async function makeDeal(otherPubId: number, otherKind: string) {
     // Check authentication before creating deal
     if (!isAuthenticated()) {
-      navigate("/auth");
+      // Save current URL to return after auth
+      const returnUrl = `/matches/${pubId}`;
+      navigate(`/auth?return=${encodeURIComponent(returnUrl)}`);
       return;
     }
 
@@ -78,11 +81,18 @@ export default function MatchesPage() {
       } else if (res.id) {
         const link = await api.dealLink(res.id);
         if (link.url) {
+          // Mark this deal as created
+          setCreatedDeals(prev => new Set(prev).add(otherPubId));
+          // Open Telegram link
           window.open(link.url, "_blank");
+          // Show success message briefly
+          setTimeout(() => {
+            setCreating(null);
+          }, 1000);
         } else {
           setError("Не удалось получить ссылку на чат");
+          setCreating(null);
         }
-        setCreating(null);
       } else {
         setError("Не удалось создать сделку");
         setCreating(null);
@@ -183,18 +193,33 @@ export default function MatchesPage() {
 
           {/* Show matches or no matches message */}
           {rows.length === 0 ? (
-            <div className="card p-6 sm:p-12 text-center">
-              <HiOutlineSparkles className="w-12 h-12 sm:w-16 sm:h-16 text-gray-300 mx-auto mb-4" />
-              <h3 className="text-base sm:text-lg font-semibold text-gray-900 mb-2">Совпадения не найдены</h3>
-              <p className="text-sm sm:text-base text-gray-600 mb-4">
-                Пока нет совпадений по этому маршруту в указанные даты. Попробуйте расширить диапазон дат или изменить параметры поиска
-              </p>
-              <button
-                onClick={() => navigate("/publish")}
-                className="btn btn-primary"
-              >
-                Создать новое объявление
-              </button>
+            <div className="card p-6 sm:p-12 text-center space-y-4">
+              <HiOutlineSparkles className="w-12 h-12 sm:w-16 sm:h-16 text-gray-300 mx-auto" />
+              <div>
+                <h3 className="text-base sm:text-lg font-semibold text-gray-900 mb-2">Совпадения не найдены</h3>
+                <p className="text-sm sm:text-base text-gray-600 mb-1">
+                  Пока нет объявлений противоположного типа по этому маршруту с пересекающимися датами.
+                </p>
+                <p className="text-xs sm:text-sm text-gray-500 mb-4">
+                  {pub.kind === "request" 
+                    ? "Нет поездок, которые могут доставить ваш запрос." 
+                    : "Нет запросов, которые можно доставить вашей поездкой."}
+                </p>
+              </div>
+              <div className="flex flex-col sm:flex-row gap-3 justify-center">
+                <button
+                  onClick={() => navigate("/")}
+                  className="btn btn-secondary"
+                >
+                  Вернуться к поиску
+                </button>
+                <button
+                  onClick={() => navigate("/publish")}
+                  className="btn btn-primary"
+                >
+                  Создать новое объявление
+                </button>
+              </div>
             </div>
           ) : (
             <>
@@ -261,23 +286,30 @@ export default function MatchesPage() {
                       </div>
                     </div>
 
-                    <button
-                      className="btn btn-primary w-full"
-                      onClick={() => makeDeal(r.other_pub_id, r.kind)}
-                      disabled={creating === r.other_pub_id}
-                    >
-                      {creating === r.other_pub_id ? (
-                        <>
-                          <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
-                          Создание чата...
-                        </>
-                      ) : (
-                        <>
-                          <HiOutlinePaperAirplane className="w-5 h-5 sm:w-5 sm:h-5" />
-                          Открыть чат в Telegram
-                        </>
-                      )}
-                    </button>
+                    {createdDeals.has(r.other_pub_id) ? (
+                      <div className="flex items-center justify-center gap-2 p-3 bg-emerald-50 border border-emerald-200 rounded-lg">
+                        <HiOutlineCheckCircle className="w-5 h-5 text-emerald-600" />
+                        <span className="text-sm font-medium text-emerald-700">Чат создан, открыт в Telegram</span>
+                      </div>
+                    ) : (
+                      <button
+                        className="btn btn-primary w-full"
+                        onClick={() => makeDeal(r.other_pub_id, r.kind)}
+                        disabled={creating === r.other_pub_id}
+                      >
+                        {creating === r.other_pub_id ? (
+                          <>
+                            <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                            Создание чата...
+                          </>
+                        ) : (
+                          <>
+                            <HiOutlinePaperAirplane className="w-5 h-5 sm:w-5 sm:h-5" />
+                            Открыть чат в Telegram
+                          </>
+                        )}
+                      </button>
+                    )}
                   </div>
                 ))}
               </div>

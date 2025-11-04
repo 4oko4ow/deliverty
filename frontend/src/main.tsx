@@ -1,4 +1,4 @@
-import React, { useEffect } from "react";
+import { StrictMode, useEffect } from "react";
 import { createRoot } from "react-dom/client";
 import { BrowserRouter, Routes, Route, Link, useLocation } from "react-router-dom";
 import { HiOutlinePaperAirplane, HiOutlinePlusCircle, HiOutlineSearch } from "react-icons/hi";
@@ -10,8 +10,8 @@ import MatchesPage from "./pages/MatchesPage";
 import AuthPage from "./pages/AuthPage";
 import PolicyFooter from "./components/PolicyFooter";
 
-const POSTHOG_KEY = import.meta.env.VITE_POSTHOG_KEY;
-const POSTHOG_HOST = import.meta.env.VITE_POSTHOG_HOST || 'https://app.posthog.com';
+const POSTHOG_KEY = import.meta.env.VITE_PUBLIC_POSTHOG_KEY;
+const POSTHOG_HOST = import.meta.env.VITE_PUBLIC_POSTHOG_HOST || 'https://app.posthog.com';
 
 // Track pageviews on route changes
 function PostHogPageView() {
@@ -31,7 +31,7 @@ function PostHogPageView() {
 
 function Header() {
   const location = useLocation();
-  
+
   return (
     <header className="sticky top-0 z-50 bg-white/80 backdrop-blur-lg border-b border-gray-200 shadow-sm">
       <div className="max-w-4xl mx-auto px-4 py-4">
@@ -47,21 +47,19 @@ function Header() {
           <nav className="hidden sm:flex gap-1">
             <Link
               to="/"
-              className={`px-4 py-2 rounded-lg text-sm font-medium transition-all ${
-                location.pathname === "/"
+              className={`px-4 py-2 rounded-lg text-sm font-medium transition-all ${location.pathname === "/"
                   ? "bg-primary-50 text-primary-700"
                   : "text-gray-600 hover:text-gray-900 hover:bg-gray-50"
-              }`}
+                }`}
             >
               Поиск
             </Link>
             <Link
               to="/publish"
-              className={`px-4 py-2 rounded-lg text-sm font-medium transition-all ${
-                location.pathname === "/publish"
+              className={`px-4 py-2 rounded-lg text-sm font-medium transition-all ${location.pathname === "/publish"
                   ? "bg-primary-50 text-primary-700"
                   : "text-gray-600 hover:text-gray-900 hover:bg-gray-50"
-              }`}
+                }`}
             >
               Создать
             </Link>
@@ -74,28 +72,26 @@ function Header() {
 
 function BottomNav() {
   const location = useLocation();
-  
+
   return (
     <nav className="fixed bottom-0 left-0 right-0 z-50 bg-white/95 backdrop-blur-lg border-t border-gray-200 sm:hidden">
       <div className="flex items-center justify-around h-16">
         <Link
           to="/"
-          className={`flex flex-col items-center justify-center gap-1 px-4 py-2 rounded-lg transition-all ${
-            location.pathname === "/"
+          className={`flex flex-col items-center justify-center gap-1 px-4 py-2 rounded-lg transition-all ${location.pathname === "/"
               ? "text-primary-600"
               : "text-gray-500"
-          }`}
+            }`}
         >
           <HiOutlineSearch className="w-6 h-6" />
           <span className="text-xs font-medium">Поиск</span>
         </Link>
         <Link
           to="/publish"
-          className={`flex flex-col items-center justify-center gap-1 px-4 py-2 rounded-lg transition-all ${
-            location.pathname === "/publish"
+          className={`flex flex-col items-center justify-center gap-1 px-4 py-2 rounded-lg transition-all ${location.pathname === "/publish"
               ? "text-primary-600"
               : "text-gray-500"
-          }`}
+            }`}
         >
           <HiOutlinePlusCircle className="w-6 h-6" />
           <span className="text-xs font-medium">Создать</span>
@@ -135,10 +131,6 @@ function App() {
 
 const options = {
   api_host: POSTHOG_HOST,
-  // Disable automatic pageview capture since we track manually with React Router
-  capture_pageview: false,
-  // Capture pageleaves automatically
-  capture_pageleave: true,
 } as const;
 
 const root = createRoot(document.getElementById("root")!);
@@ -146,13 +138,19 @@ const root = createRoot(document.getElementById("root")!);
 // Wrap app with PostHogProvider if API key is provided
 if (POSTHOG_KEY) {
   root.render(
-    <PostHogProvider apiKey={POSTHOG_KEY} options={options}>
-      <App />
-    </PostHogProvider>
+    <StrictMode>
+      <PostHogProvider apiKey={POSTHOG_KEY} options={options}>
+        <App />
+      </PostHogProvider>
+    </StrictMode>
   );
 } else {
   if (import.meta.env.DEV) {
     console.warn('⚠️ PostHog key not found. Analytics will be disabled.');
   }
-  root.render(<App />);
+  root.render(
+    <StrictMode>
+      <App />
+    </StrictMode>
+  );
 }

@@ -19,8 +19,9 @@ export default function AuthPage() {
     if (authSuccess === "1" && userId) {
       // Save user ID to localStorage
       localStorage.setItem("tg_uid", userId);
-      // Redirect to home
-      navigate("/");
+      // Redirect to return URL or home
+      const returnUrl = searchParams.get("return");
+      navigate(returnUrl || "/");
     } else if (error) {
       console.error("Auth error:", error);
     }
