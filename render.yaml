@@ -3,9 +3,9 @@ services:
   - type: web
     name: deliverty-api
     env: go
-    region: oregon
+    region: frankfurt
     rootDir: backend
-    buildCommand: go build -o api ./cmd/api
+    buildCommand: go mod download && go build -o api ./cmd/api
     startCommand: ./api
     envVars:
       - key: DATABASE_URL

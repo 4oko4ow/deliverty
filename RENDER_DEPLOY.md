@@ -39,11 +39,13 @@ Deploy backend as **Web Service**:
    - **Name**: `deliverty-api`
    - **Region**: Choose closest to your users (e.g., `Oregon`, `Frankfurt`)
    - **Branch**: `main` (or your main branch)
-   - **Root Directory**: `backend` (or leave empty and adjust build command)
-   - **Environment**: `Go`
-   - **Build Command**: `go build -o api ./cmd/api`
+   - **Root Directory**: `backend`
+   - **Environment**: `Go` ⚠️ **Important**: Make sure to select "Go" not "Docker"
+   - **Build Command**: `go mod download && go build -o api ./cmd/api`
    - **Start Command**: `./api`
    - **Health Check Path**: `/healthz`
+   
+   **Note**: If Render auto-detects Docker, go to "Advanced" settings and ensure "Environment" is set to "Go" (not "Docker").
 
 5. Add environment variables:
    - `DATABASE_URL` - Your Supabase Postgres connection string
@@ -132,13 +134,29 @@ Render automatically deploys when you push to the connected branch. To manually 
 
 ## Troubleshooting
 
+### Docker build error: "/backend": not found
+
+If you see an error like `failed to solve: failed to compute cache key: "/backend": not found`, Render is trying to use Docker instead of native Go build.
+
+**Solution:**
+1. Go to your service in Render Dashboard
+2. Click "Settings" → Scroll to "Build & Deploy"
+3. Under "Environment", change from "Docker" to "Go"
+4. Ensure "Root Directory" is set to `backend`
+5. Ensure "Build Command" is: `go mod download && go build -o api ./cmd/api`
+6. Ensure "Start Command" is: `./api`
+7. Save and redeploy
+
+Alternatively, if using Blueprint:
+- Delete the service and recreate it manually using the steps above
+- Or temporarily rename/remove `backend/Dockerfile` if you're not using Docker
+
 ### Backend not starting
 
 - Check logs in Render Dashboard
 - Verify all environment variables are set
 - Verify `DATABASE_URL` is correct and accessible
 - Check health check endpoint: `https://your-api.onrender.com/healthz`
-
 
 ### Database connection errors
 
