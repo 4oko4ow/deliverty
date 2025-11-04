@@ -6,17 +6,83 @@ import { HiOutlinePaperAirplane, HiOutlineCheckCircle, HiOutlineX } from "react-
 const TG_BOT = import.meta.env.VITE_TG_BOT || "your_bot";
 const API_BASE = import.meta.env.VITE_API_BASE || "http://localhost:8080/api";
 
+interface TelegramUser {
+  id: number;
+  first_name: string;
+  last_name?: string;
+  username?: string;
+  photo_url?: string;
+  auth_date: number;
+  hash: string;
+}
+
 export default function AuthPage() {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const [showSuccess, setShowSuccess] = useState(false);
   const [showBotLink, setShowBotLink] = useState(false);
+  const [isProcessing, setIsProcessing] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
-  // Check if we're returning from Telegram auth
+  // Handle Telegram auth callback (callback mode)
+  const handleTelegramAuth = async (user: TelegramUser) => {
+    if (isProcessing) return;
+    
+    setIsProcessing(true);
+    setError(null);
+
+    try {
+      // Build query string from user data
+      const params = new URLSearchParams({
+        id: user.id.toString(),
+        first_name: user.first_name,
+        auth_date: user.auth_date.toString(),
+        hash: user.hash,
+      });
+      
+      if (user.last_name) params.set("last_name", user.last_name);
+      if (user.username) params.set("username", user.username);
+      if (user.photo_url) params.set("photo_url", user.photo_url);
+
+      // Send auth data to backend for validation (callback mode)
+      const response = await fetch(`${API_BASE}/auth/telegram?${params.toString()}&callback=1`, {
+        headers: {
+          "Accept": "application/json",
+          "X-Requested-With": "XMLHttpRequest",
+        },
+      });
+      
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({ error: "Auth validation failed" }));
+        throw new Error(errorData.message || errorData.error || "Auth validation failed");
+      }
+
+      // Backend returns JSON in callback mode
+      const data = await response.json();
+      if (data.success && data.user_id) {
+        localStorage.setItem("tg_uid", data.user_id.toString());
+        setShowSuccess(true);
+        setShowBotLink(true);
+        setTimeout(() => {
+          setShowSuccess(false);
+          navigate("/");
+        }, 5000);
+      } else {
+        throw new Error("Invalid response from server");
+      }
+    } catch (err) {
+      console.error("Auth error:", err);
+      setError("Ошибка авторизации. Попробуйте еще раз.");
+    } finally {
+      setIsProcessing(false);
+    }
+  };
+
+  // Check if we're returning from Telegram auth (redirect mode fallback)
   useEffect(() => {
     const authSuccess = searchParams.get("auth_success");
     const userId = searchParams.get("user_id");
-    const error = searchParams.get("error");
+    const errorParam = searchParams.get("error");
 
     if (authSuccess === "1" && userId) {
       // Save user ID to localStorage
@@ -31,8 +97,8 @@ export default function AuthPage() {
         const returnUrl = searchParams.get("return");
         navigate(returnUrl || "/");
       }, 5000);
-    } else if (error) {
-      console.error("Auth error:", error);
+    } else if (errorParam) {
+      setError("Ошибка авторизации. Попробуйте еще раз.");
     }
   }, [searchParams, navigate]);
 
@@ -72,11 +138,19 @@ export default function AuthPage() {
           </div>
 
           <div className="flex justify-center">
-            <TelegramLogin
-              botName={TG_BOT}
-              authUrl={authUrl}
-              buttonSize="large"
-            />
+            {isProcessing ? (
+              <div className="flex items-center gap-2 text-gray-600">
+                <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-primary-600"></div>
+                <span>Обработка...</span>
+              </div>
+            ) : (
+              <TelegramLogin
+                botName={TG_BOT}
+                authUrl={authUrl}
+                onAuth={handleTelegramAuth}
+                buttonSize="large"
+              />
+            )}
           </div>
 
           <div className="mt-6 pt-6 border-t border-gray-200">
@@ -124,10 +198,10 @@ export default function AuthPage() {
           </div>
         )}
 
-        {searchParams.get("error") && (
+        {(error || searchParams.get("error")) && (
           <div className="mt-4 p-4 bg-red-50 border border-red-200 rounded-lg">
             <p className="text-sm text-red-800">
-              Ошибка авторизации. Попробуйте еще раз.
+              {error || "Ошибка авторизации. Попробуйте еще раз."}
             </p>
           </div>
         )}

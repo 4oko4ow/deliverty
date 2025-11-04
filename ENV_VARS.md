@@ -10,6 +10,7 @@
 | `TG_BOT_TOKEN` | ✅ **Required** | Telegram bot token from [@BotFather](https://t.me/BotFather) | `123456:ABC-your-bot-token` |
 | `TG_BOT_NAME` | ✅ **Required** | Telegram bot username (without @) | `deliverty_bot` |
 | `TG_DEEPLINK_SECRET` | ✅ **Required** | Random secret string for deep link signing | `your-random-secret-string-here` |
+| `FRONTEND_URL` | ⚠️ **Recommended** | Frontend URL for auth redirects (auto-detected from Referer if not set) | `https://your-project.vercel.app` |
 | `HTTP_ADDR` | ❌ Optional | Server address (defaults to `:8080` or uses `PORT`) | `:8080` |
 | `PORT` | ❌ Optional | Render/Heroku standard (auto-set by Render) | `10000` |
 
@@ -35,6 +36,7 @@ DATABASE_URL=postgresql://postgres:[PASSWORD]@[PROJECT].supabase.co:6543/postgre
 TG_BOT_TOKEN=123456:ABC-your-bot-token
 TG_BOT_NAME=deliverty_bot
 TG_DEEPLINK_SECRET=your-random-secret-string-here
+FRONTEND_URL=https://your-project.vercel.app
 ```
 
 **How to get Session Pooler URL:**
@@ -44,6 +46,65 @@ TG_DEEPLINK_SECRET=your-random-secret-string-here
 4. Copy the connection string with port **6543**
 
 **Important**: After backend is deployed, use your Render backend URL in frontend's `VITE_API_BASE` environment variable.
+
+## Telegram Bot Setup
+
+### Step 1: Create Bot and Get Token
+
+1. Talk to [@BotFather](https://t.me/BotFather) in Telegram
+2. Send `/newbot` and follow instructions
+3. Save your bot token and username
+
+### Step 2: Configure Environment Variables
+
+Set these in your backend (Render) environment variables:
+- `TG_BOT_TOKEN` - Bot token from BotFather
+- `TG_BOT_NAME` - Bot username (without @)
+- `TG_DEEPLINK_SECRET` - Random secret string (generate with: `openssl rand -hex 16`)
+
+### Step 3: Set Telegram Webhook ⚠️ **REQUIRED**
+
+After backend is deployed, you **MUST** configure the Telegram webhook so the bot can receive messages.
+
+**Option A: Using the setup script** (recommended):
+```bash
+export TG_BOT_TOKEN=your-bot-token-here
+./ops/setup_webhook.sh https://your-backend-url.onrender.com
+```
+
+**Option B: Manual setup**:
+```bash
+BOT_TOKEN=your-bot-token-here
+BACKEND_URL=https://your-backend-url.onrender.com
+
+curl -X POST "https://api.telegram.org/bot$BOT_TOKEN/setWebhook" \
+  -H "Content-Type: application/json" \
+  -d "{\"url\":\"$BACKEND_URL/bot/webhook\"}"
+```
+
+**Verify webhook is set**:
+```bash
+curl "https://api.telegram.org/bot$BOT_TOKEN/getWebhookInfo"
+```
+
+**⚠️ Important**: 
+- Webhook URL must be HTTPS (required by Telegram)
+- Backend must be publicly accessible
+- Webhook endpoint is `/bot/webhook` (no authentication required)
+
+### Step 4: Set Domain for Login Widget
+
+For Telegram Login Widget to work in production:
+
+1. Send `/setdomain` to [@BotFather](https://t.me/BotFather)
+2. Select your bot
+3. Provide your **frontend URL** (where Login Widget is hosted)
+   - **If using Vercel**: `your-project.vercel.app` (or your custom domain)
+   - **If using other hosting**: your frontend domain
+   - ⚠️ **Important**: Use your **frontend URL**, NOT backend URL
+
+**For local development**:
+- Use a tunnel service (ngrok, localtunnel) or skip auth (uses fallback user ID in dev mode)
 
 ## Local Development
 
