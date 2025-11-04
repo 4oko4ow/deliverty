@@ -19,7 +19,7 @@ export default function MatchesPage() {
     let a = true;
     setLoading(true);
     setError(null);
-    
+
     // Fetch both publication and matches in parallel
     Promise.all([
       api.getPub(pubId!),
@@ -27,7 +27,7 @@ export default function MatchesPage() {
     ]).then(([pubData, matchesData]) => {
       if (a) {
         let hasPubError = false;
-        
+
         // Handle publication
         if (pubData.error) {
           setError(pubData.error || "Объявление не найдено");
@@ -35,7 +35,7 @@ export default function MatchesPage() {
         } else {
           setPub(pubData);
         }
-        
+
         // Handle matches
         if (Array.isArray(matchesData)) {
           setRows(matchesData);
@@ -62,7 +62,7 @@ export default function MatchesPage() {
 
   async function makeDeal(otherPubId: number, otherKind: string) {
     console.log("[FRONTEND] makeDeal called", { otherPubId, otherKind, pubId });
-    
+
     // Check authentication before creating deal
     if (!isAuthenticated()) {
       console.log("[FRONTEND] Not authenticated, redirecting");
@@ -78,10 +78,10 @@ export default function MatchesPage() {
       const reqId = otherKind === "trip" ? Number(pubId) : otherPubId;
       const tripId = otherKind === "trip" ? otherPubId : Number(pubId);
       console.log("[FRONTEND] Creating deal", { reqId, tripId });
-      
+
       const res = await api.createDeal(reqId, tripId);
       console.log("[FRONTEND] createDeal response", res);
-      
+
       if (res.error) {
         console.error("[FRONTEND] createDeal error", res.error);
         setError(res.error || "Ошибка при создании сделки");
@@ -90,16 +90,35 @@ export default function MatchesPage() {
         console.log("[FRONTEND] Deal created, getting link for deal ID:", res.id);
         const link = await api.dealLink(res.id);
         console.log("[FRONTEND] dealLink response", link);
-        
+
         if (link.url) {
           console.log("[FRONTEND] Opening Telegram link:", link.url);
           // Mark this deal as created
           setCreatedDeals(prev => new Set(prev).add(otherPubId));
+
+          // Try to open in Telegram app first
+          // If on mobile, try tg:// protocol first, otherwise use https://t.me
+          const isMobile = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
+          let telegramUrl = link.url;
+
+          if (isMobile) {
+            // Try to use tg:// protocol for mobile
+            const tgLink = link.url.replace('https://t.me/', 'tg://resolve?domain=');
+            // Extract start parameter
+            const urlObj = new URL(link.url);
+            const startParam = urlObj.searchParams.get('start');
+            if (startParam) {
+              telegramUrl = `tg://resolve?domain=${link.url.split('t.me/')[1].split('?')[0]}&start=${startParam}`;
+            }
+          }
+
+          console.log("[FRONTEND] Opening Telegram URL:", telegramUrl);
+
           // Open Telegram link
-          const opened = window.open(link.url, "_blank");
+          const opened = window.open(telegramUrl, "_blank");
           if (!opened) {
             console.error("[FRONTEND] Popup blocked by browser");
-            setError("Браузер заблокировал открытие Telegram. Разрешите всплывающие окна.");
+            setError("Браузер заблокировал открытие Telegram. Разрешите всплывающие окна или откройте ссылку вручную: " + link.url);
             setCreating(null);
             return;
           }
@@ -107,7 +126,7 @@ export default function MatchesPage() {
           // Show success message briefly
           setTimeout(() => {
             setCreating(null);
-          }, 1000);
+          }, 2000);
         } else {
           console.error("[FRONTEND] No URL in dealLink response", link);
           setError(link.error || "Не удалось получить ссылку на чат");
@@ -168,12 +187,12 @@ export default function MatchesPage() {
               {pub.kind === "request" ? (
                 <span className="badge-primary">
                   <HiOutlineGift className="w-3 h-3 sm:w-3 sm:h-3" />
-                  <span className="text-xs sm:text-xs">Нужна доставка</span>
+                  <span className="text-xs sm:text-xs">Ищу</span>
                 </span>
               ) : (
                 <span className="badge-success">
                   <HiOutlineTruck className="w-3 h-3 sm:w-3 sm:h-3" />
-                  <span className="text-xs sm:text-xs">Могу доставить</span>
+                  <span className="text-xs sm:text-xs">Лечу</span>
                 </span>
               )}
             </div>
@@ -211,42 +230,21 @@ export default function MatchesPage() {
                 <p className="text-sm text-gray-700 whitespace-pre-wrap">{pub.description}</p>
               </div>
             )}
-            
-            {/* Action button for original publication */}
+
+            {/* Action button for creating counter publication */}
             <div className="mt-4 pt-4 border-t border-gray-100">
-              <div className={`border rounded-lg p-4 ${rows.length === 0 ? 'bg-blue-50 border-blue-200' : 'bg-gray-50 border-gray-200'}`}>
-                <div className="flex items-start gap-3 mb-3">
-                  <HiOutlinePaperAirplane className={`w-5 h-5 flex-shrink-0 mt-0.5 ${rows.length === 0 ? 'text-blue-600' : 'text-gray-600'}`} />
-                  <div>
-                    <p className={`text-sm font-semibold mb-1 ${rows.length === 0 ? 'text-blue-900' : 'text-gray-900'}`}>
-                      {rows.length === 0 
-                        ? "Хотите связаться с автором этого объявления?"
-                        : "Альтернативный вариант"}
-                    </p>
-                    <p className={`text-xs ${rows.length === 0 ? 'text-blue-700' : 'text-gray-600'}`}>
-                      {rows.length === 0 
-                        ? (pub.kind === "request" 
-                            ? "Создайте объявление о поездке по этому маршруту, чтобы автор увидел вас в совпадениях и мог связаться." 
-                            : "Создайте запрос на доставку по этому маршруту, чтобы автор увидел вас в совпадениях и мог связаться.")
-                        : (pub.kind === "request" 
-                            ? "Вместо выбора существующего совпадения, вы можете создать свое объявление о поездке, чтобы автор увидел вас." 
-                            : "Вместо выбора существующего совпадения, вы можете создать свой запрос, чтобы автор увидел вас.")}
-                    </p>
-                  </div>
-                </div>
-                <button
-                  onClick={() => {
-                    // Navigate to publish page with pre-filled data
-                    // Same route, opposite kind (request ↔ trip)
-                    const oppositeKind = pub.kind === "request" ? "trip" : "request";
-                    navigate(`/publish?kind=${oppositeKind}&from=${pub.from_iata}&to=${pub.to_iata}&date_start=${pub.date_start}&date_end=${pub.date_end}`);
-                  }}
-                  className={`btn w-full sm:w-auto ${rows.length === 0 ? 'btn-primary' : 'btn-secondary'}`}
-                >
-                  <HiOutlinePaperAirplane className="w-4 h-4" />
-                  Создать встречное объявление
-                </button>
-              </div>
+              <button
+                onClick={() => {
+                  // Navigate to publish page with pre-filled data
+                  // Same route, opposite kind (request ↔ trip)
+                  const oppositeKind = pub.kind === "request" ? "trip" : "request";
+                  navigate(`/publish?kind=${oppositeKind}&from=${pub.from_iata}&to=${pub.to_iata}&date_start=${pub.date_start}&date_end=${pub.date_end}`);
+                }}
+                className="btn btn-secondary w-full"
+              >
+                <HiOutlinePaperAirplane className="w-4 h-4" />
+                {pub.kind === "request" ? "Я лечу по этому маршруту" : "Мне нужно что-то передать"}
+              </button>
             </div>
           </div>
 
@@ -260,8 +258,8 @@ export default function MatchesPage() {
                   Пока нет объявлений противоположного типа по этому маршруту с пересекающимися датами.
                 </p>
                 <p className="text-xs sm:text-sm text-gray-500 mb-4">
-                  {pub.kind === "request" 
-                    ? "Нет поездок, которые могут доставить ваш запрос." 
+                  {pub.kind === "request"
+                    ? "Нет поездок, которые могут доставить ваш запрос."
                     : "Нет запросов, которые можно доставить вашей поездкой."}
                 </p>
               </div>
@@ -315,12 +313,12 @@ export default function MatchesPage() {
                         {r.kind === "request" ? (
                           <span className="badge-primary">
                             <HiOutlineGift className="w-3 h-3 sm:w-3 sm:h-3" />
-                            <span className="text-xs sm:text-xs">Нужна доставка</span>
+                            <span className="text-xs sm:text-xs">Ищу</span>
                           </span>
                         ) : (
                           <span className="badge-success">
                             <HiOutlineTruck className="w-3 h-3 sm:w-3 sm:h-3" />
-                            <span className="text-xs sm:text-xs">Могу доставить</span>
+                            <span className="text-xs sm:text-xs">Лечу</span>
                           </span>
                         )}
                       </div>
@@ -386,7 +384,7 @@ export default function MatchesPage() {
                   </div>
                 ))}
               </div>
-              
+
               {error && (
                 <div className="flex items-start gap-2 p-4 bg-red-50 border border-red-200 rounded-lg">
                   <HiOutlineExclamationCircle className="w-5 h-5 text-red-600 flex-shrink-0 mt-0.5" />

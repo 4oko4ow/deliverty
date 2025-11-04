@@ -78,14 +78,14 @@ export default function PublishPage() {
                 weight,
                 description: desc,
             };
-            
+
             // Add trip-specific fields
             if (kind === "trip") {
                 if (flightNo) body.flight_no = flightNo;
                 if (airline) body.airline = airline;
                 if (capacityHint) body.capacity_hint = capacityHint;
             }
-            
+
             const res = await api.createPub(body);
             if ('error' in res) {
                 setError(res.error || "Ошибка при создании объявления");
@@ -108,9 +108,9 @@ export default function PublishPage() {
             <div className="text-center space-y-2">
                 <h1 className="text-2xl sm:text-3xl font-bold text-gray-900">Создать объявление</h1>
                 <p className="text-sm sm:text-base text-gray-600">
-                    {kind === "request" 
-                        ? "Нужно передать что-то? Создайте запрос и мы найдем людей, которые летят по вашему маршруту"
-                        : "Летите по маршруту? Создайте объявление о поездке и найдите тех, кому нужно что-то передать"}
+                    {kind === "request"
+                        ? "Нужно передать что-то? Создайте запрос и найдем тех, кто летит по вашему маршруту"
+                        : "Летите по маршруту? Создайте объявление и найдем тех, кому нужно что-то передать"}
                 </p>
             </div>
 
@@ -124,39 +124,37 @@ export default function PublishPage() {
                         <button
                             type="button"
                             onClick={() => setKind("request")}
-                            className={`p-3 sm:p-4 rounded-lg border-2 transition-all touch-manipulation min-h-[100px] sm:min-h-[120px] ${
-                                kind === "request"
+                            className={`p-3 sm:p-4 rounded-lg border-2 transition-all touch-manipulation min-h-[100px] sm:min-h-[120px] ${kind === "request"
                                     ? "border-primary-500 bg-primary-50"
                                     : "border-gray-200 hover:border-gray-300 active:bg-gray-50"
-                            }`}
+                                }`}
                         >
                             <div className="flex flex-col sm:flex-row items-center gap-1.5 sm:gap-2 justify-center mb-2">
                                 <HiOutlineGift className={`w-5 h-5 sm:w-5 sm:h-5 ${kind === "request" ? "text-primary-600" : "text-gray-400"}`} />
                                 <span className={`font-semibold text-sm sm:text-base ${kind === "request" ? "text-primary-900" : "text-gray-600"}`}>
-                                    Хочу отправить
+                                    Я ищу
                                 </span>
                             </div>
                             <p className="text-xs sm:text-xs text-gray-500 text-center">
-                                Ищу путешественника для доставки
+                                Нужна доставка
                             </p>
                         </button>
                         <button
                             type="button"
                             onClick={() => setKind("trip")}
-                            className={`p-3 sm:p-4 rounded-lg border-2 transition-all touch-manipulation min-h-[100px] sm:min-h-[120px] ${
-                                kind === "trip"
+                            className={`p-3 sm:p-4 rounded-lg border-2 transition-all touch-manipulation min-h-[100px] sm:min-h-[120px] ${kind === "trip"
                                     ? "border-primary-500 bg-primary-50"
                                     : "border-gray-200 hover:border-gray-300 active:bg-gray-50"
-                            }`}
+                                }`}
                         >
                             <div className="flex flex-col sm:flex-row items-center gap-1.5 sm:gap-2 justify-center mb-2">
                                 <HiOutlineTruck className={`w-5 h-5 sm:w-5 sm:h-5 ${kind === "trip" ? "text-primary-600" : "text-gray-400"}`} />
                                 <span className={`font-semibold text-sm sm:text-base ${kind === "trip" ? "text-primary-900" : "text-gray-600"}`}>
-                                    Я еду
+                                    Я лечу
                                 </span>
                             </div>
                             <p className="text-xs sm:text-xs text-gray-500 text-center">
-                                Могу взять посылку с собой
+                                Могу взять посылку
                             </p>
                         </button>
                     </div>

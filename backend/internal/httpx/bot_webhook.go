@@ -27,8 +27,17 @@ type Update struct {
 
 func registerBotRoutes(r *gin.Engine, pool *pgxpool.Pool) {
 	r.POST("/bot/webhook", func(c *gin.Context) {
+		log.Printf("[BOT] Webhook called - received request")
+		
 		var up Update
-		if err := c.ShouldBindJSON(&up); err != nil || up.Message == nil {
+		if err := c.ShouldBindJSON(&up); err != nil {
+			log.Printf("[BOT] Failed to parse JSON: %v", err)
+			c.Status(http.StatusOK)
+			return
+		}
+		
+		if up.Message == nil {
+			log.Printf("[BOT] Update received but Message is nil (might be callback_query, edited_message, etc.)")
 			c.Status(http.StatusOK)
 			return
 		}
@@ -36,7 +45,7 @@ func registerBotRoutes(r *gin.Engine, pool *pgxpool.Pool) {
 		tg := bot.New()
 		text := strings.TrimSpace(up.Message.Text)
 
-		log.Printf("[BOT] Received message from user %d: %q", up.Message.From.ID, text)
+		log.Printf("[BOT] Received message from user %d (chat %d): %q", up.Message.From.ID, up.Message.Chat.ID, text)
 
 		// Handle /start command
 		if strings.HasPrefix(text, "/start") {

@@ -10,7 +10,7 @@ export default function BrowsePage() {
   const navigate = useNavigate();
   const [from, setFrom] = useState("");
   const [to, setTo] = useState("");
-  const [kindFilter, setKindFilter] = useState<"all" | "request" | "trip">("all");
+  const [kindFilter, setKindFilter] = useState<"request" | "trip">("request");
   const [rows, setRows] = useState<any[]>([]);
   const [matchesMap, setMatchesMap] = useState<Record<number, any[]>>({});
   const [loadingMatches, setLoadingMatches] = useState<Record<number, boolean>>({});
@@ -29,18 +29,20 @@ export default function BrowsePage() {
     setMatchesMap({});
     try {
       // Если выбран конкретный тип, ищем противоположный (совпадения)
+      // Если kindFilter "all", не задаем searchKind - покажем все
       let searchKind: string | undefined;
       if (kindFilter === "request") {
-        searchKind = "trip"; // Ищем поездки для запросов
+        searchKind = "trip"; // Я ищу → показываем поездки
       } else if (kindFilter === "trip") {
-        searchKind = "request"; // Ищем запросы для поездок
+        searchKind = "request"; // Я лечу → показываем запросы
       }
+      // kindFilter === "all" → searchKind остается undefined, покажем все
 
       const result: any = await api.listPubs(from, to, searchKind);
       if (Array.isArray(result)) {
         setRows(result);
-        // Если выбран конкретный тип, загружаем совпадения для каждого результата
-        if (kindFilter !== "all" && result.length > 0) {
+        // Загружаем совпадения для каждого результата
+        if (result.length > 0) {
           loadMatchesForResults(result);
         }
       } else if (result && typeof result === "object" && "error" in result) {
@@ -103,44 +105,37 @@ export default function BrowsePage() {
         {/* Filter by kind */}
         <div>
           <label className="block text-sm sm:text-sm font-medium text-gray-700 mb-2">
-            Что искать
+            Я
           </label>
-          <div className="grid grid-cols-3 gap-2">
-            <button
-              type="button"
-              onClick={() => setKindFilter("all")}
-              className={`px-3 py-2.5 sm:px-4 sm:py-2 rounded-lg border-2 transition-all text-xs sm:text-sm touch-manipulation min-h-[48px] ${kindFilter === "all"
-                ? "border-primary-500 bg-primary-50 text-primary-900 font-semibold"
-                : "border-gray-200 hover:border-gray-300 active:bg-gray-50 text-gray-600"
-                }`}
-            >
-              Все
-            </button>
+          <div className="grid grid-cols-2 gap-2">
             <button
               type="button"
               onClick={() => setKindFilter("request")}
-              className={`px-2 py-2.5 sm:px-4 sm:py-2 rounded-lg border-2 transition-all text-xs sm:text-sm flex items-center justify-center gap-1 sm:gap-1.5 touch-manipulation min-h-[48px] ${kindFilter === "request"
+              className={`px-3 py-3 sm:px-4 sm:py-3 rounded-lg border-2 transition-all text-sm sm:text-base flex items-center justify-center gap-2 touch-manipulation min-h-[56px] ${kindFilter === "request"
                 ? "border-primary-500 bg-primary-50 text-primary-900 font-semibold"
-                : "border-gray-200 hover:border-gray-300 active:bg-gray-50 text-gray-600"
+                : "border-gray-200 hover:border-gray-300 active:bg-gray-50 text-gray-700"
                 }`}
             >
-              <HiOutlineGift className="w-4 h-4 sm:w-4 sm:h-4 flex-shrink-0" />
-              <span className="hidden sm:inline">Нужна доставка</span>
-              <span className="sm:hidden">Нужна</span>
+              <HiOutlineGift className="w-5 h-5 sm:w-5 sm:h-5 flex-shrink-0" />
+              <span>ищу</span>
             </button>
             <button
               type="button"
               onClick={() => setKindFilter("trip")}
-              className={`px-2 py-2.5 sm:px-4 sm:py-2 rounded-lg border-2 transition-all text-xs sm:text-sm flex items-center justify-center gap-1 sm:gap-1.5 touch-manipulation min-h-[48px] ${kindFilter === "trip"
+              className={`px-3 py-3 sm:px-4 sm:py-3 rounded-lg border-2 transition-all text-sm sm:text-base flex items-center justify-center gap-2 touch-manipulation min-h-[56px] ${kindFilter === "trip"
                 ? "border-primary-500 bg-primary-50 text-primary-900 font-semibold"
-                : "border-gray-200 hover:border-gray-300 active:bg-gray-50 text-gray-600"
+                : "border-gray-200 hover:border-gray-300 active:bg-gray-50 text-gray-700"
                 }`}
             >
-              <HiOutlineTruck className="w-4 h-4 sm:w-4 sm:h-4 flex-shrink-0" />
-              <span className="hidden sm:inline">Могу доставить</span>
-              <span className="sm:hidden">Могу</span>
+              <HiOutlineTruck className="w-5 h-5 sm:w-5 sm:h-5 flex-shrink-0" />
+              <span>лечу</span>
             </button>
           </div>
+          <p className="text-xs text-gray-500 mt-2 text-center">
+            {kindFilter === "request"
+              ? "Найду поездки, которые могут доставить ваш запрос"
+              : "Найду запросы, которые можно доставить вашей поездкой"}
+          </p>
         </div>
 
         <button
@@ -182,23 +177,28 @@ export default function BrowsePage() {
               <h3 className="text-base sm:text-lg font-semibold text-gray-900 mb-2">Результаты не найдены</h3>
               <p className="text-sm sm:text-base text-gray-600 mb-4">
                 {kindFilter === "trip"
-                  ? "Пока нет людей, которые могут доставить по этому маршруту. Попробуйте изменить критерии поиска или даты, или создайте свое объявление"
-                  : kindFilter === "request"
-                    ? "Пока нет объявлений о нужной доставке по этому маршруту. Попробуйте изменить критерии поиска или даты, или создайте свое объявление"
-                    : "Пока нет объявлений по этому маршруту. Попробуйте изменить критерии поиска или даты, или создайте свое объявление"}
+                  ? "Пока нет запросов на доставку по этому маршруту. Попробуйте изменить критерии поиска или создайте свое объявление."
+                  : "Пока нет поездок по этому маршруту. Попробуйте изменить критерии поиска или создайте свое объявление."}
               </p>
-              <button
-                onClick={() => {
-                  setFrom("");
-                  setTo("");
-                  setKindFilter("all");
-                  setSearched(false);
-                  setRows([]);
-                }}
-                className="btn btn-secondary"
-              >
-                Очистить поиск
-              </button>
+              <div className="flex flex-col sm:flex-row gap-3 justify-center">
+                <button
+                  onClick={() => {
+                    setFrom("");
+                    setTo("");
+                    setSearched(false);
+                    setRows([]);
+                  }}
+                  className="btn btn-secondary"
+                >
+                  Очистить поиск
+                </button>
+                <button
+                  onClick={() => navigate(`/publish?kind=${kindFilter === "request" ? "request" : "trip"}&from=${from}&to=${to}`)}
+                  className="btn btn-primary"
+                >
+                  Создать объявление
+                </button>
+              </div>
             </div>
           ) : (
             <>
@@ -220,12 +220,12 @@ export default function BrowsePage() {
                         {r.kind === "request" ? (
                           <span className="badge-primary">
                             <HiOutlineGift className="w-3 h-3 sm:w-3 sm:h-3" />
-                            <span className="text-xs sm:text-xs">Нужна доставка</span>
+                            <span className="text-xs sm:text-xs">Ищу</span>
                           </span>
                         ) : (
                           <span className="badge-success">
                             <HiOutlineTruck className="w-3 h-3 sm:w-3 sm:h-3" />
-                            <span className="text-xs sm:text-xs">Могу доставить</span>
+                            <span className="text-xs sm:text-xs">Лечу</span>
                           </span>
                         )}
                       </div>
@@ -260,8 +260,8 @@ export default function BrowsePage() {
                       </div>
                     </div>
 
-                    {/* Show matches if available and kindFilter is set */}
-                    {kindFilter !== "all" && matchesMap[r.id] !== undefined && (
+                    {/* Show matches if available */}
+                    {matchesMap[r.id] !== undefined && (
                       <div className="mt-4 pt-4 border-t border-gray-100">
                         {loadingMatches[r.id] ? (
                           <div className="flex items-center gap-2 text-xs text-gray-500">
@@ -281,12 +281,12 @@ export default function BrowsePage() {
                                     {match.kind === "request" ? (
                                       <span className="badge-primary text-xs px-1.5 py-0.5">
                                         <HiOutlineGift className="w-3 h-3" />
-                                        <span>Нужна доставка</span>
+                                        <span>Ищу</span>
                                       </span>
                                     ) : (
                                       <span className="badge-success text-xs px-1.5 py-0.5">
                                         <HiOutlineTruck className="w-3 h-3" />
-                                        <span>Могу доставить</span>
+                                        <span>Лечу</span>
                                       </span>
                                     )}
                                     <span className="text-primary-600 font-semibold">{match.score}%</span>
@@ -308,7 +308,7 @@ export default function BrowsePage() {
 
                     <div className="flex items-center justify-between pt-4 border-t border-gray-100 mt-4">
                       <span className="text-xs sm:text-sm text-gray-500">
-                        {kindFilter === "all" ? "Нажмите, чтобы просмотреть совпадения" : "Открыть детали"}
+                        Открыть детали
                       </span>
                       <button
                         className="btn btn-primary text-xs sm:text-sm px-3 py-2"
@@ -317,7 +317,7 @@ export default function BrowsePage() {
                           navigate(`/matches/${r.id}`);
                         }}
                       >
-                        {kindFilter === "all" ? "Совпадения" : "Детали"}
+                        Детали
                         <HiArrowRight className="w-4 h-4 ml-1" />
                       </button>
                     </div>
