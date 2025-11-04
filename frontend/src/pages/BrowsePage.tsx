@@ -35,7 +35,9 @@ export default function BrowsePage() {
       }
       // kindFilter === "all" → searchKind остается undefined, покажем все
 
+      console.log("[BrowsePage] Search params:", { kindFilter, searchKind, from, to });
       const result: any = await api.listPubs(from, to, searchKind);
+      console.log("[BrowsePage] Search result:", result);
       if (Array.isArray(result)) {
         setRows(result);
         // Не загружаем совпадения на странице поиска - они будут показаны на странице детального просмотра
