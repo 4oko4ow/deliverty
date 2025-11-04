@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"log"
 	"os"
 
@@ -8,6 +9,7 @@ import (
 	"github.com/joho/godotenv"
 	"github.com/sol/deliverty/backend/internal/db"
 	"github.com/sol/deliverty/backend/internal/httpx"
+	"github.com/sol/deliverty/backend/internal/migrations"
 )
 
 func main() {
@@ -23,6 +25,12 @@ func main() {
 		log.Fatal(err)
 	}
 	defer pool.Close()
+
+	// Run database migrations on startup
+	ctx := context.Background()
+	if err := migrations.Run(ctx, pool); err != nil {
+		log.Fatalf("Failed to run migrations: %v", err)
+	}
 
 	r := gin.Default()
 	httpx.RegisterRoutes(r, pool)
