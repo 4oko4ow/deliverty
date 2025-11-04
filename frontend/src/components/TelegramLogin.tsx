@@ -19,8 +19,10 @@ interface TelegramLoginProps {
 
 /**
  * Telegram Login Widget component
- * Uses callback mode (data-onauth) instead of redirect mode to avoid infinite loading
+ * Uses redirect mode (data-auth-url) - Telegram sends notification automatically
  * See: https://core.telegram.org/widgets/login
+ * 
+ * Note: Telegram only sends login notifications in redirect mode when domain is set via /setdomain
  */
 export default function TelegramLogin({
   botName,
@@ -36,20 +38,14 @@ export default function TelegramLogin({
       containerRef.current.innerHTML = "";
     }
 
-    // Create callback function on window object
-    // This function will be called by Telegram widget after successful auth
-    const callbackName = `onTelegramAuth_${botName.replace(/[^a-zA-Z0-9]/g, '_')}`;
-    (window as any)[callbackName] = (user: TelegramUser) => {
-      onAuth(user);
-    };
-
     // Load Telegram widget script
+    // Using redirect mode (data-auth-url) so Telegram sends notification automatically
     const script = document.createElement("script");
     script.async = true;
     script.src = "https://telegram.org/js/telegram-widget.js?22";
     script.setAttribute("data-telegram-login", botName);
     script.setAttribute("data-size", buttonSize);
-    script.setAttribute("data-onauth", callbackName + "(user)");
+    script.setAttribute("data-auth-url", authUrl);
     script.setAttribute("data-request-access", "write");
     script.setAttribute("data-userpic", "true");
 
@@ -58,10 +54,6 @@ export default function TelegramLogin({
     }
 
     return () => {
-      // Cleanup: remove callback function
-      if ((window as any)[callbackName]) {
-        delete (window as any)[callbackName];
-      }
       if (containerRef.current) {
         containerRef.current.innerHTML = "";
       }
