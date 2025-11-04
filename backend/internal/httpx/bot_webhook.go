@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"log"
 	"net/http"
+	"net/url"
 	"strings"
 
 	"github.com/gin-gonic/gin"
@@ -72,10 +73,20 @@ func registerBotRoutes(r *gin.Engine, pool *pgxpool.Pool) {
 				return
 			}
 
-			// /start deal:<id>:<sig>
+			// /start deal:<id>:<sig> (or URL-encoded)
 			if strings.HasPrefix(text, "/start ") {
+				var err error
 				startParam := strings.TrimPrefix(text, "/start ")
-				log.Printf("[BOT] Processing deep-link: %q", startParam)
+				log.Printf("[BOT] Processing deep-link (raw): %q", startParam)
+				
+				// Try to URL-decode in case Telegram didn't decode it automatically
+				decoded, err := url.QueryUnescape(startParam)
+				if err == nil && decoded != startParam {
+					log.Printf("[BOT] URL-decoded parameter: %q -> %q", startParam, decoded)
+					startParam = decoded
+				}
+				
+				log.Printf("[BOT] Processing deep-link (after decode): %q", startParam)
 				
 				parts := strings.Split(startParam, ":")
 				log.Printf("[BOT] Split parts: %v (len=%d)", parts, len(parts))
@@ -111,7 +122,7 @@ func registerBotRoutes(r *gin.Engine, pool *pgxpool.Pool) {
 
 				// Ensure participant belongs to deal
 				var ok bool
-				err := pool.QueryRow(c, `
+				err = pool.QueryRow(c, `
 				  SELECT EXISTS(
 				    SELECT 1 FROM deal d
 				      JOIN publication pr ON pr.id=d.request_pub_id

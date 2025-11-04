@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"log"
 	"net/http"
+	"net/url"
 	"os"
 
 	"github.com/gin-gonic/gin"
@@ -62,9 +63,12 @@ func dealDeepLink(pool *pgxpool.Pool) gin.HandlerFunc {
 		
 		payload := fmt.Sprintf("deal:%s", dealID)
 		sig := bot.Sign(payload)
-		link := fmt.Sprintf("https://t.me/%s?start=%s:%s", botName, payload, sig)
+		// URL-encode the start parameter to avoid issues with colons and special characters
+		startParam := fmt.Sprintf("%s:%s", payload, sig)
+		encodedStart := url.QueryEscape(startParam)
+		link := fmt.Sprintf("https://t.me/%s?start=%s", botName, encodedStart)
 		
-		log.Printf("[DEEPLINK] Generated link: payload=%q, sig=%q, link=%q", payload, sig, link)
+		log.Printf("[DEEPLINK] Generated link: payload=%q, sig=%q, startParam=%q, encoded=%q, link=%q", payload, sig, startParam, encodedStart, link)
 
 		c.JSON(http.StatusOK, gin.H{"url": link})
 	}
