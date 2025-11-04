@@ -1,7 +1,7 @@
 import { useState } from "react";
 import AirportInput from "../components/AirportInput";
-import { api } from "../lib/api";
-import { Link, useNavigate } from "react-router-dom";
+import { api, isAuthenticated } from "../lib/api";
+import { useNavigate } from "react-router-dom";
 import { HiOutlineSearch, HiOutlineLocationMarker, HiOutlineCalendar, HiOutlineCube, HiArrowRight, HiOutlineExclamationCircle, HiOutlineSparkles } from "react-icons/hi";
 import { HiOutlineTruck, HiOutlineGift } from "react-icons/hi2";
 import { formatItem, formatWeight } from "../lib/translations";
@@ -15,6 +15,7 @@ export default function BrowsePage() {
   const [loading, setLoading] = useState(false);
   const [searched, setSearched] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [creating, setCreating] = useState<number | null>(null);
 
   async function search() {
     if (!from || !to) {
@@ -35,9 +36,7 @@ export default function BrowsePage() {
       }
       // kindFilter === "all" → searchKind остается undefined, покажем все
 
-      console.log("[BrowsePage] Search params:", { kindFilter, searchKind, from, to });
       const result: any = await api.listPubs(from, to, searchKind);
-      console.log("[BrowsePage] Search result:", result);
       if (Array.isArray(result)) {
         setRows(result);
         // Не загружаем совпадения на странице поиска - они будут показаны на странице детального просмотра
@@ -55,6 +54,39 @@ export default function BrowsePage() {
     }
   }
 
+  async function makeDeal(resultPub: any) {
+    // Check authentication
+    if (!isAuthenticated()) {
+      navigate(`/auth?return=${encodeURIComponent(window.location.pathname + window.location.search)}`);
+      return;
+    }
+
+    setCreating(resultPub.id);
+    setError(null);
+
+    try {
+      // If user searches "Я ищу" (request), they see "trip" results
+      // To create deal, we need user's request publication
+      // For MVP: just navigate to create request with pre-filled data
+      if (kindFilter === "request") {
+        navigate(`/publish?kind=request&from=${resultPub.from_iata}&to=${resultPub.to_iata}&date_start=${resultPub.date_start}&date_end=${resultPub.date_end}&create_deal_with=${resultPub.id}`);
+        setCreating(null);
+        return;
+      }
+
+      // If user searches "Я лечу" (trip), they see "request" results
+      // To create deal, we need user's trip publication
+      if (kindFilter === "trip") {
+        navigate(`/publish?kind=trip&from=${resultPub.from_iata}&to=${resultPub.to_iata}&date_start=${resultPub.date_start}&date_end=${resultPub.date_end}&create_deal_with=${resultPub.id}`);
+        setCreating(null);
+        return;
+      }
+    } catch (err) {
+      console.error("[BrowsePage] makeDeal error", err);
+      setError("Произошла ошибка. Попробуйте еще раз.");
+      setCreating(null);
+    }
+  }
 
 
   const formatDate = (dateStr: string) => {
@@ -183,9 +215,8 @@ export default function BrowsePage() {
               </div>
               <div className="grid gap-4">
                 {rows.map((r, idx) => (
-                  <Link
+                  <div
                     key={r.id}
-                    to={`/matches/${r.id}`}
                     className="card-hover p-4 sm:p-5 animate-slide-up touch-manipulation"
                     style={{ animationDelay: `${idx * 50}ms` }}
                   >
@@ -234,22 +265,31 @@ export default function BrowsePage() {
                       </div>
                     </div>
 
-                    <div className="flex items-center justify-between pt-4 border-t border-gray-100 mt-4">
-                      <span className="text-xs sm:text-sm text-gray-500">
-                        Открыть, чтобы увидеть совпадения
-                      </span>
+                    {r.description && (
+                      <div className="mb-4 pt-4 border-t border-gray-100">
+                        <p className="text-sm text-gray-700 whitespace-pre-wrap line-clamp-2">{r.description}</p>
+                      </div>
+                    )}
+
+                    <div className="flex items-center justify-end pt-4 border-t border-gray-100 mt-4">
                       <button
-                        className="btn btn-primary text-xs sm:text-sm px-3 py-2"
-                        onClick={(e) => {
-                          e.preventDefault();
-                          navigate(`/matches/${r.id}`);
-                        }}
+                        className="btn btn-primary text-xs sm:text-sm px-4 py-2"
+                        onClick={() => makeDeal(r)}
+                        disabled={creating === r.id}
                       >
-                        Совпадения
-                        <HiArrowRight className="w-4 h-4 ml-1" />
+                        {creating === r.id ? (
+                          <>
+                            <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                            Подождите...
+                          </>
+                        ) : (
+                          <>
+                            {kindFilter === "request" ? "Создать запрос и связаться" : "Создать объявление и связаться"}
+                          </>
+                        )}
                       </button>
                     </div>
-                  </Link>
+                  </div>
                 ))}
               </div>
             </>
