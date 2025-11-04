@@ -172,13 +172,13 @@ export default function MatchesPage() {
       <div className="text-center space-y-2">
         <h1 className="text-2xl sm:text-3xl font-bold text-gray-900">
           {pub?.kind === "request"
-            ? "Найдены путешественники"
-            : "Найдены запросы на доставку"}
+            ? "Ваш запрос на доставку"
+            : "Путешественник может доставить"}
         </h1>
         <p className="text-sm sm:text-base text-gray-600">
           {pub?.kind === "request"
-            ? "Путешественники, которые могут доставить ваш запрос по этому маршруту"
-            : "Запросы на доставку, которые можно выполнить этой поездкой"}
+            ? "Ниже показаны путешественники, которые могут доставить ваш запрос"
+            : "Это объявление путешественника. Вы можете связаться с ним или посмотреть совпадения с другими запросами."}
         </p>
       </div>
 
@@ -246,6 +246,29 @@ export default function MatchesPage() {
               </div>
             )}
 
+            {/* Direct contact button for trip publications */}
+            {pub.kind === "trip" && (
+              <div className="mt-4 pt-4 border-t border-gray-100">
+                <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+                  <p className="text-sm font-semibold text-blue-900 mb-2">
+                    Хотите, чтобы этот путешественник доставил вашу посылку?
+                  </p>
+                  <p className="text-xs text-blue-700 mb-3">
+                    Создайте запрос на доставку, и вы сможете связаться с путешественником в Telegram.
+                  </p>
+                  <button
+                    onClick={() => {
+                      navigate(`/publish?kind=request&from=${pub.from_iata}&to=${pub.to_iata}&date_start=${pub.date_start}&date_end=${pub.date_end}`);
+                    }}
+                    className="btn btn-primary w-full sm:w-auto"
+                  >
+                    <HiOutlinePaperAirplane className="w-4 h-4" />
+                    Создать запрос и связаться
+                  </button>
+                </div>
+              </div>
+            )}
+
           </div>
 
           {/* Show matches or no matches message */}
@@ -297,8 +320,8 @@ export default function MatchesPage() {
                     </p>
                     <p className="text-xs text-green-700">
                       {pub?.kind === "request"
-                        ? "Ниже список путешественников, которые летят по вашему маршруту. Выберите подходящего и откройте чат в Telegram."
-                        : "Ниже список запросов на доставку по этому маршруту. Выберите подходящий и откройте чат в Telegram."}
+                        ? "Ниже список путешественников, которые могут доставить ваш запрос. Выберите подходящего и откройте чат в Telegram."
+                        : "Это совпадения этого объявления с другими запросами. Если у вас есть запрос на доставку, используйте кнопку выше для связи."}
                     </p>
                   </div>
                 </div>
