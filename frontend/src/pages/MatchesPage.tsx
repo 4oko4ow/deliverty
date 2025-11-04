@@ -318,15 +318,17 @@ export default function MatchesPage() {
                   >
                     <div className="flex flex-col sm:flex-row items-start sm:items-start justify-between gap-3 mb-4">
                       <div className="flex items-center gap-2">
-                        {r.kind === "request" ? (
+                        {pub.kind === "request" ? (
+                          // Если пользователь ищет доставку, совпадения - это те, кто может доставить
+                          <span className="badge-success">
+                            <HiOutlineTruck className="w-3 h-3 sm:w-3 sm:h-3" />
+                            <span className="text-xs sm:text-xs">Лечу, могу доставить</span>
+                          </span>
+                        ) : (
+                          // Если пользователь может доставить, совпадения - это те, кому нужна доставка
                           <span className="badge-primary">
                             <HiOutlineGift className="w-3 h-3 sm:w-3 sm:h-3" />
                             <span className="text-xs sm:text-xs">Ищу кто летит</span>
-                          </span>
-                        ) : (
-                          <span className="badge-success">
-                            <HiOutlineTruck className="w-3 h-3 sm:w-3 sm:h-3" />
-                            <span className="text-xs sm:text-xs">Лечу</span>
                           </span>
                         )}
                       </div>

@@ -1,12 +1,18 @@
 package httpx
 
 import (
+	"context"
+	"fmt"
+	"log"
 	"net/http"
+	"net/url"
+	"os"
 	"strconv"
 	"time"
 
 	"github.com/gin-gonic/gin"
 	"github.com/jackc/pgx/v5/pgxpool"
+	"github.com/sol/deliverty/backend/internal/bot"
 	"github.com/sol/deliverty/backend/internal/match"
 )
 
@@ -155,6 +161,63 @@ func createDeal(pool *pgxpool.Pool) gin.HandlerFunc {
 			c.JSON(http.StatusConflict, gin.H{"error": "deal exists?"})
 			return
 		}
+
+		// Send notification to both participants via Telegram
+		go func() {
+			ctx := context.Background()
+			tg := bot.New()
+			if tg.Token == "" {
+				return
+			}
+
+			var reqTG, tripTG int64
+			err := pool.QueryRow(ctx, `
+				SELECT ur.tg_user_id, ut.tg_user_id
+				FROM deal d
+				JOIN publication pr ON pr.id=d.request_pub_id
+				JOIN app_user ur ON ur.id=pr.user_id
+				JOIN publication pt ON pt.id=d.trip_pub_id
+				JOIN app_user ut ON ut.id=pt.user_id
+				WHERE d.id=$1
+			`, dealID).Scan(&reqTG, &tripTG)
+
+			if err != nil {
+				log.Printf("[DEAL] Failed to get participants for deal %d: %v", dealID, err)
+				return
+			}
+
+			botName := os.Getenv("TG_BOT_NAME")
+			if botName == "" {
+				log.Printf("[DEAL] TG_BOT_NAME not set, cannot generate deep-link")
+				return
+			}
+
+			payload := fmt.Sprintf("deal:%d", dealID)
+			sig := bot.Sign(payload)
+			startParam := fmt.Sprintf("%s:%s", payload, sig)
+			encodedStart := url.QueryEscape(startParam)
+			link := fmt.Sprintf("https://t.me/%s?start=%s", botName, encodedStart)
+
+			msg := fmt.Sprintf("✅ Создана новая сделка!\n\nНажмите на ссылку, чтобы начать общение:\n%s\n\nИли отправьте команду:\n/start %s", link, startParam)
+
+			// Send to both participants
+			if reqTG != 0 {
+				_, err := tg.API("sendMessage", gin.H{"chat_id": reqTG, "text": msg})
+				if err != nil {
+					log.Printf("[DEAL] Failed to send message to request user %d: %v", reqTG, err)
+				} else {
+					log.Printf("[DEAL] Sent notification to request user %d for deal %d", reqTG, dealID)
+				}
+			}
+			if tripTG != 0 {
+				_, err := tg.API("sendMessage", gin.H{"chat_id": tripTG, "text": msg})
+				if err != nil {
+					log.Printf("[DEAL] Failed to send message to trip user %d: %v", tripTG, err)
+				} else {
+					log.Printf("[DEAL] Sent notification to trip user %d for deal %d", tripTG, dealID)
+				}
+			}
+		}()
 
 		c.JSON(http.StatusOK, gin.H{"id": dealID})
 	}
