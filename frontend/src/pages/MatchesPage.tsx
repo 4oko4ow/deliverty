@@ -170,11 +170,15 @@ export default function MatchesPage() {
       </button>
 
       <div className="text-center space-y-2">
-        <h1 className="text-2xl sm:text-3xl font-bold text-gray-900">Найденные совпадения</h1>
+        <h1 className="text-2xl sm:text-3xl font-bold text-gray-900">
+          {pub?.kind === "request"
+            ? "Найдены путешественники"
+            : "Найдены запросы на доставку"}
+        </h1>
         <p className="text-sm sm:text-base text-gray-600">
           {pub?.kind === "request"
-            ? "Найдены путешественники, которые могут доставить ваш запрос"
-            : "Найдены запросы, которые можно доставить вашей поездкой"}
+            ? "Путешественники, которые могут доставить ваш запрос по этому маршруту"
+            : "Запросы на доставку, которые можно выполнить этой поездкой"}
         </p>
       </div>
 
@@ -187,18 +191,25 @@ export default function MatchesPage() {
         <>
           {/* Show original publication */}
           <div className="card p-4 sm:p-6">
-            <div className="flex items-center gap-2 mb-4">
-              {pub.kind === "request" ? (
-                <span className="badge-primary">
-                  <HiOutlineGift className="w-3 h-3 sm:w-3 sm:h-3" />
-                  <span className="text-xs sm:text-xs">Ищу кто летит</span>
-                </span>
-              ) : (
-                <span className="badge-success">
-                  <HiOutlineTruck className="w-3 h-3 sm:w-3 sm:h-3" />
-                  <span className="text-xs sm:text-xs">Лечу</span>
-                </span>
-              )}
+            <div className="mb-3">
+              <p className="text-xs text-gray-500 mb-2">
+                {pub.kind === "request"
+                  ? "Объявление: запрос на доставку"
+                  : "Объявление: путешественник может доставить"}
+              </p>
+              <div className="flex items-center gap-2">
+                {pub.kind === "request" ? (
+                  <span className="badge-primary">
+                    <HiOutlineGift className="w-3 h-3 sm:w-3 sm:h-3" />
+                    <span className="text-xs sm:text-xs">Ищу кто летит</span>
+                  </span>
+                ) : (
+                  <span className="badge-success">
+                    <HiOutlineTruck className="w-3 h-3 sm:w-3 sm:h-3" />
+                    <span className="text-xs sm:text-xs">Лечу</span>
+                  </span>
+                )}
+              </div>
             </div>
 
             <div className="flex items-center gap-2 sm:gap-3 mb-4">
@@ -286,8 +297,8 @@ export default function MatchesPage() {
                     </p>
                     <p className="text-xs text-green-700">
                       {pub?.kind === "request"
-                        ? "Выберите путешественника, который может доставить ваш запрос, и откройте чат в Telegram."
-                        : "Выберите запрос, который можете доставить, и откройте чат в Telegram."}
+                        ? "Ниже список путешественников, которые летят по вашему маршруту. Выберите подходящего и откройте чат в Telegram."
+                        : "Ниже список запросов на доставку по этому маршруту. Выберите подходящий и откройте чат в Telegram."}
                     </p>
                   </div>
                 </div>
@@ -310,13 +321,13 @@ export default function MatchesPage() {
                     <div className="flex flex-col sm:flex-row items-start sm:items-start justify-between gap-3 mb-4">
                       <div className="flex items-center gap-2">
                         {pub.kind === "request" ? (
-                          // Если пользователь ищет доставку, совпадения - это те, кто может доставить
+                          // Если исходное объявление "Ищу", совпадения - это те, кто "Лечу"
                           <span className="badge-success">
                             <HiOutlineTruck className="w-3 h-3 sm:w-3 sm:h-3" />
                             <span className="text-xs sm:text-xs">Лечу, могу доставить</span>
                           </span>
                         ) : (
-                          // Если пользователь может доставить, совпадения - это те, кому нужна доставка
+                          // Если исходное объявление "Лечу", совпадения - это те, кто "Ищу"
                           <span className="badge-primary">
                             <HiOutlineGift className="w-3 h-3 sm:w-3 sm:h-3" />
                             <span className="text-xs sm:text-xs">Ищу кто летит</span>
