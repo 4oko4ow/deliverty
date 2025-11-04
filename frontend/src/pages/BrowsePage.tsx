@@ -133,8 +133,8 @@ export default function BrowsePage() {
           </div>
           <p className="text-xs text-gray-500 mt-2 text-center">
             {kindFilter === "request"
-              ? "Найду поездки, которые могут доставить ваш запрос"
-              : "Найду запросы, которые можно доставить вашей поездкой"}
+              ? "Найду путешественников, которые летят по вашему маршруту"
+              : "Найду запросы на доставку по вашему маршруту"}
           </p>
         </div>
 
@@ -177,8 +177,8 @@ export default function BrowsePage() {
               <h3 className="text-base sm:text-lg font-semibold text-gray-900 mb-2">Результаты не найдены</h3>
               <p className="text-sm sm:text-base text-gray-600 mb-4">
                 {kindFilter === "trip"
-                  ? "Пока нет запросов на доставку по этому маршруту. Попробуйте изменить критерии поиска или создайте свое объявление."
-                  : "Пока нет поездок по этому маршруту. Попробуйте изменить критерии поиска или создайте свое объявление."}
+                  ? "Пока нет запросов на доставку по этому маршруту. Создайте свое объявление или попробуйте изменить критерии поиска."
+                  : "Пока нет путешественников по этому маршруту. Создайте свое объявление или попробуйте изменить критерии поиска."}
               </p>
               <div className="flex flex-col sm:flex-row gap-3 justify-center">
                 <button
@@ -220,7 +220,7 @@ export default function BrowsePage() {
                         {r.kind === "request" ? (
                           <span className="badge-primary">
                             <HiOutlineGift className="w-3 h-3 sm:w-3 sm:h-3" />
-                            <span className="text-xs sm:text-xs">Ищу</span>
+                            <span className="text-xs sm:text-xs">Ищу кто летит</span>
                           </span>
                         ) : (
                           <span className="badge-success">
@@ -281,7 +281,7 @@ export default function BrowsePage() {
                                     {match.kind === "request" ? (
                                       <span className="badge-primary text-xs px-1.5 py-0.5">
                                         <HiOutlineGift className="w-3 h-3" />
-                                        <span>Ищу</span>
+                                        <span>Ищу кто летит</span>
                                       </span>
                                     ) : (
                                       <span className="badge-success text-xs px-1.5 py-0.5">

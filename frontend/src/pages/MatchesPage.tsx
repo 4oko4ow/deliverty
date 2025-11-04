@@ -171,7 +171,11 @@ export default function MatchesPage() {
 
       <div className="text-center space-y-2">
         <h1 className="text-2xl sm:text-3xl font-bold text-gray-900">Найденные совпадения</h1>
-        <p className="text-sm sm:text-base text-gray-600">Найдены объявления, которые совпадают с вашим маршрутом</p>
+        <p className="text-sm sm:text-base text-gray-600">
+          {pub?.kind === "request"
+            ? "Найдены путешественники, которые могут доставить ваш запрос"
+            : "Найдены запросы, которые можно доставить вашей поездкой"}
+        </p>
       </div>
 
       {loading ? (
@@ -187,7 +191,7 @@ export default function MatchesPage() {
               {pub.kind === "request" ? (
                 <span className="badge-primary">
                   <HiOutlineGift className="w-3 h-3 sm:w-3 sm:h-3" />
-                  <span className="text-xs sm:text-xs">Ищу</span>
+                  <span className="text-xs sm:text-xs">Ищу кто летит</span>
                 </span>
               ) : (
                 <span className="badge-success">
@@ -255,12 +259,14 @@ export default function MatchesPage() {
               <div>
                 <h3 className="text-base sm:text-lg font-semibold text-gray-900 mb-2">Совпадения не найдены</h3>
                 <p className="text-sm sm:text-base text-gray-600 mb-1">
-                  Пока нет объявлений противоположного типа по этому маршруту с пересекающимися датами.
+                  {pub.kind === "request"
+                    ? "Пока нет путешественников, которые летят по этому маршруту в нужные даты."
+                    : "Пока нет запросов на доставку по этому маршруту в ваши даты."}
                 </p>
                 <p className="text-xs sm:text-sm text-gray-500 mb-4">
                   {pub.kind === "request"
-                    ? "Нет поездок, которые могут доставить ваш запрос."
-                    : "Нет запросов, которые можно доставить вашей поездкой."}
+                    ? "Создайте объявление о поездке, чтобы вас могли найти другие пользователи."
+                    : "Создайте запрос на доставку, чтобы вас могли найти путешественники."}
                 </p>
               </div>
               <div className="flex flex-col sm:flex-row gap-3 justify-center">
@@ -288,7 +294,9 @@ export default function MatchesPage() {
                       Найдены совпадения!
                     </p>
                     <p className="text-xs text-green-700">
-                      Выберите подходящий вариант ниже и нажмите "Открыть чат в Telegram", чтобы связаться с автором.
+                      {pub?.kind === "request"
+                        ? "Выберите путешественника, который может доставить ваш запрос, и откройте чат в Telegram."
+                        : "Выберите запрос, который можете доставить, и откройте чат в Telegram."}
                     </p>
                   </div>
                 </div>
@@ -313,7 +321,7 @@ export default function MatchesPage() {
                         {r.kind === "request" ? (
                           <span className="badge-primary">
                             <HiOutlineGift className="w-3 h-3 sm:w-3 sm:h-3" />
-                            <span className="text-xs sm:text-xs">Ищу</span>
+                            <span className="text-xs sm:text-xs">Ищу кто летит</span>
                           </span>
                         ) : (
                           <span className="badge-success">
