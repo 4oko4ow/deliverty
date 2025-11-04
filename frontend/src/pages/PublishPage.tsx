@@ -2,10 +2,11 @@ import { useState } from "react";
 import AirportInput from "../components/AirportInput";
 import { api } from "../lib/api";
 import { useNavigate } from "react-router-dom";
-import { HiOutlineCalendar, HiOutlineCube, HiOutlineExclamationCircle } from "react-icons/hi";
-import { HiOutlineSparkles } from "react-icons/hi2";
+import { HiOutlineCalendar, HiOutlineCube, HiOutlineExclamationCircle, HiOutlinePaperAirplane } from "react-icons/hi";
+import { HiOutlineSparkles, HiOutlineGift, HiOutlineTruck } from "react-icons/hi2";
 
 export default function PublishPage() {
+    const [kind, setKind] = useState<"request" | "trip">("request");
     const [from, setFrom] = useState("");
     const [to, setTo] = useState("");
     const [dateStart, setDS] = useState("");
@@ -13,6 +14,9 @@ export default function PublishPage() {
     const [item, setItem] = useState("documents");
     const [weight, setWeight] = useState("envelope");
     const [desc, setDesc] = useState("");
+    const [flightNo, setFlightNo] = useState("");
+    const [airline, setAirline] = useState("");
+    const [capacityHint, setCapacityHint] = useState("");
     const [submitting, setSubmitting] = useState(false);
     const [error, setError] = useState<string | null>(null);
     const nav = useNavigate();
@@ -41,7 +45,7 @@ export default function PublishPage() {
         setSubmitting(true);
         try {
             const body: any = {
-                kind: "request",
+                kind,
                 from_iata: from,
                 to_iata: to,
                 date_start: dateStart,
@@ -50,6 +54,14 @@ export default function PublishPage() {
                 weight,
                 description: desc,
             };
+            
+            // Add trip-specific fields
+            if (kind === "trip") {
+                if (flightNo) body.flight_no = flightNo;
+                if (airline) body.airline = airline;
+                if (capacityHint) body.capacity_hint = capacityHint;
+            }
+            
             const res = await api.createPub(body);
             if ('error' in res) {
                 setError(res.error || "Ошибка при создании объявления");
@@ -71,10 +83,61 @@ export default function PublishPage() {
         <div className="max-w-2xl mx-auto space-y-6 animate-fade-in">
             <div className="text-center space-y-2">
                 <h1 className="text-3xl font-bold text-gray-900">Создать объявление</h1>
-                <p className="text-gray-600">Нужно передать что-то? Создайте запрос и мы найдем людей, которые летят по вашему маршруту</p>
+                <p className="text-gray-600">
+                    {kind === "request" 
+                        ? "Нужно передать что-то? Создайте запрос и мы найдем людей, которые летят по вашему маршруту"
+                        : "Летите по маршруту? Создайте объявление о поездке и найдите тех, кому нужно что-то передать"}
+                </p>
             </div>
 
             <div className="card p-6 space-y-6">
+                {/* Publication Type Selection */}
+                <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-3">
+                        Тип объявления
+                    </label>
+                    <div className="grid grid-cols-2 gap-3">
+                        <button
+                            type="button"
+                            onClick={() => setKind("request")}
+                            className={`p-4 rounded-lg border-2 transition-all ${
+                                kind === "request"
+                                    ? "border-primary-500 bg-primary-50"
+                                    : "border-gray-200 hover:border-gray-300"
+                            }`}
+                        >
+                            <div className="flex items-center gap-2 justify-center mb-2">
+                                <HiOutlineGift className={`w-5 h-5 ${kind === "request" ? "text-primary-600" : "text-gray-400"}`} />
+                                <span className={`font-semibold ${kind === "request" ? "text-primary-900" : "text-gray-600"}`}>
+                                    Хочу отправить
+                                </span>
+                            </div>
+                            <p className="text-xs text-gray-500 text-center">
+                                Ищу путешественника для доставки
+                            </p>
+                        </button>
+                        <button
+                            type="button"
+                            onClick={() => setKind("trip")}
+                            className={`p-4 rounded-lg border-2 transition-all ${
+                                kind === "trip"
+                                    ? "border-primary-500 bg-primary-50"
+                                    : "border-gray-200 hover:border-gray-300"
+                            }`}
+                        >
+                            <div className="flex items-center gap-2 justify-center mb-2">
+                                <HiOutlineTruck className={`w-5 h-5 ${kind === "trip" ? "text-primary-600" : "text-gray-400"}`} />
+                                <span className={`font-semibold ${kind === "trip" ? "text-primary-900" : "text-gray-600"}`}>
+                                    Я еду
+                                </span>
+                            </div>
+                            <p className="text-xs text-gray-500 text-center">
+                                Могу взять посылку с собой
+                            </p>
+                        </button>
+                    </div>
+                </div>
+
                 {/* Route */}
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                     <AirportInput label="Откуда" value={from} onChange={setFrom} />
@@ -115,7 +178,7 @@ export default function PublishPage() {
                 <div>
                     <label className="block text-sm font-medium text-gray-700 mb-2">
                         <HiOutlineCube className="w-4 h-4 inline mr-1" />
-                        Характеристики отправления
+                        {kind === "request" ? "Характеристики отправления" : "Что могу взять"}
                     </label>
                     <div className="grid grid-cols-2 gap-3">
                         <div>
@@ -144,6 +207,54 @@ export default function PublishPage() {
                     </div>
                 </div>
 
+                {/* Trip-specific fields */}
+                {kind === "trip" && (
+                    <div className="space-y-4 p-4 bg-blue-50 rounded-lg border border-blue-200">
+                        <label className="block text-sm font-medium text-gray-700 mb-3">
+                            <HiOutlinePaperAirplane className="w-4 h-4 inline mr-1" />
+                            Информация о рейсе (необязательно)
+                        </label>
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                            <div>
+                                <label className="block text-xs text-gray-500 mb-1">Номер рейса</label>
+                                <input
+                                    className="input"
+                                    type="text"
+                                    placeholder="SU123"
+                                    value={flightNo}
+                                    onChange={(e) => setFlightNo(e.target.value)}
+                                    maxLength={20}
+                                />
+                            </div>
+                            <div>
+                                <label className="block text-xs text-gray-500 mb-1">Авиакомпания</label>
+                                <input
+                                    className="input"
+                                    type="text"
+                                    placeholder="Аэрофлот"
+                                    value={airline}
+                                    onChange={(e) => setAirline(e.target.value)}
+                                    maxLength={50}
+                                />
+                            </div>
+                        </div>
+                        <div>
+                            <label className="block text-xs text-gray-500 mb-1">Емкость (необязательно)</label>
+                            <input
+                                className="input"
+                                type="text"
+                                placeholder="например: конверт/1кг/3кг"
+                                value={capacityHint}
+                                onChange={(e) => setCapacityHint(e.target.value)}
+                                maxLength={50}
+                            />
+                            <p className="text-xs text-gray-400 mt-1">
+                                Укажите, что конкретно можете взять с собой
+                            </p>
+                        </div>
+                    </div>
+                )}
+
                 {/* Description */}
                 <div>
                     <label className="block text-sm font-medium text-gray-700 mb-2">
@@ -151,7 +262,11 @@ export default function PublishPage() {
                     </label>
                     <textarea
                         className="input h-32 resize-none"
-                        placeholder="Добавьте дополнительные детали о том, что нужно передать. Учтите: контакты (телефон, @username, ссылки) запрещены в описании."
+                        placeholder={
+                            kind === "request"
+                                ? "Добавьте дополнительные детали о том, что нужно передать. Учтите: контакты (телефон, @username, ссылки) запрещены в описании."
+                                : "Добавьте дополнительные детали о вашей поездке. Учтите: контакты (телефон, @username, ссылки) запрещены в описании."
+                        }
                         value={desc}
                         onChange={(e) => {
                             setDesc(e.target.value);
@@ -178,7 +293,7 @@ export default function PublishPage() {
                     ) : (
                         <>
                             <HiOutlineSparkles className="w-5 h-5" />
-                            Опубликовать и найти совпадения
+                            {kind === "request" ? "Опубликовать и найти совпадения" : "Опубликовать поездку"}
                         </>
                     )}
                 </button>

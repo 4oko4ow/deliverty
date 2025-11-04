@@ -9,6 +9,7 @@ import { formatItem, formatWeight } from "../lib/translations";
 export default function BrowsePage() {
   const [from, setFrom] = useState("");
   const [to, setTo] = useState("");
+  const [kindFilter, setKindFilter] = useState<"all" | "request" | "trip">("all");
   const [rows, setRows] = useState<any[]>([]);
   const [loading, setLoading] = useState(false);
   const [searched, setSearched] = useState(false);
@@ -23,7 +24,7 @@ export default function BrowsePage() {
     setLoading(true);
     setSearched(true);
     try {
-      const result = await api.listPubs(from, to, "trip");
+      const result = await api.listPubs(from, to, kindFilter === "all" ? undefined : kindFilter);
       if (Array.isArray(result)) {
         setRows(result);
       } else if (result.error) {
@@ -50,13 +51,57 @@ export default function BrowsePage() {
     <div className="space-y-6 animate-fade-in">
       <div className="text-center space-y-2">
         <h1 className="text-3xl font-bold text-gray-900">Найдите подходящий вариант</h1>
-        <p className="text-gray-600">Поиск людей, которые летят по пути и могут взять что-то с собой</p>
+        <p className="text-gray-600">Поиск объявлений по маршруту</p>
       </div>
 
       <div className="card p-6 space-y-4">
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
           <AirportInput label="Откуда" value={from} onChange={setFrom} />
           <AirportInput label="Куда" value={to} onChange={setTo} />
+        </div>
+
+        {/* Filter by kind */}
+        <div>
+          <label className="block text-sm font-medium text-gray-700 mb-2">
+            Тип объявлений
+          </label>
+          <div className="grid grid-cols-3 gap-2">
+            <button
+              type="button"
+              onClick={() => setKindFilter("all")}
+              className={`px-4 py-2 rounded-lg border-2 transition-all text-sm ${
+                kindFilter === "all"
+                  ? "border-primary-500 bg-primary-50 text-primary-900 font-semibold"
+                  : "border-gray-200 hover:border-gray-300 text-gray-600"
+              }`}
+            >
+              Все
+            </button>
+            <button
+              type="button"
+              onClick={() => setKindFilter("request")}
+              className={`px-4 py-2 rounded-lg border-2 transition-all text-sm flex items-center justify-center gap-1.5 ${
+                kindFilter === "request"
+                  ? "border-primary-500 bg-primary-50 text-primary-900 font-semibold"
+                  : "border-gray-200 hover:border-gray-300 text-gray-600"
+              }`}
+            >
+              <HiOutlineGift className="w-4 h-4" />
+              Запросы
+            </button>
+            <button
+              type="button"
+              onClick={() => setKindFilter("trip")}
+              className={`px-4 py-2 rounded-lg border-2 transition-all text-sm flex items-center justify-center gap-1.5 ${
+                kindFilter === "trip"
+                  ? "border-primary-500 bg-primary-50 text-primary-900 font-semibold"
+                  : "border-gray-200 hover:border-gray-300 text-gray-600"
+              }`}
+            >
+              <HiOutlineTruck className="w-4 h-4" />
+              Поездки
+            </button>
+          </div>
         </div>
 
         <button
@@ -96,11 +141,18 @@ export default function BrowsePage() {
             <div className="card p-12 text-center">
               <HiOutlineSearch className="w-16 h-16 text-gray-300 mx-auto mb-4" />
               <h3 className="text-lg font-semibold text-gray-900 mb-2">Результаты не найдены</h3>
-              <p className="text-gray-600 mb-4">Пока нет людей, которые летят по этому маршруту. Попробуйте изменить критерии поиска или даты, или создайте свое объявление</p>
+              <p className="text-gray-600 mb-4">
+                {kindFilter === "trip"
+                  ? "Пока нет людей, которые летят по этому маршруту. Попробуйте изменить критерии поиска или даты, или создайте свое объявление"
+                  : kindFilter === "request"
+                  ? "Пока нет запросов по этому маршруту. Попробуйте изменить критерии поиска или даты, или создайте свое объявление"
+                  : "Пока нет объявлений по этому маршруту. Попробуйте изменить критерии поиска или даты, или создайте свое объявление"}
+              </p>
               <button
                 onClick={() => {
                   setFrom("");
                   setTo("");
+                  setKindFilter("all");
                   setSearched(false);
                   setRows([]);
                 }}
