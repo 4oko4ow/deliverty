@@ -63,7 +63,7 @@ export default function BrowsePage() {
         {/* Filter by kind */}
         <div>
           <label className="block text-sm font-medium text-gray-700 mb-2">
-            Тип объявлений
+            Что искать
           </label>
           <div className="grid grid-cols-3 gap-2">
             <button
@@ -87,7 +87,7 @@ export default function BrowsePage() {
               }`}
             >
               <HiOutlineGift className="w-4 h-4" />
-              Запросы
+              Нужна доставка
             </button>
             <button
               type="button"
@@ -99,7 +99,7 @@ export default function BrowsePage() {
               }`}
             >
               <HiOutlineTruck className="w-4 h-4" />
-              Поездки
+              Могу доставить
             </button>
           </div>
         </div>
@@ -143,9 +143,9 @@ export default function BrowsePage() {
               <h3 className="text-lg font-semibold text-gray-900 mb-2">Результаты не найдены</h3>
               <p className="text-gray-600 mb-4">
                 {kindFilter === "trip"
-                  ? "Пока нет людей, которые летят по этому маршруту. Попробуйте изменить критерии поиска или даты, или создайте свое объявление"
+                  ? "Пока нет людей, которые могут доставить по этому маршруту. Попробуйте изменить критерии поиска или даты, или создайте свое объявление"
                   : kindFilter === "request"
-                  ? "Пока нет запросов по этому маршруту. Попробуйте изменить критерии поиска или даты, или создайте свое объявление"
+                  ? "Пока нет объявлений о нужной доставке по этому маршруту. Попробуйте изменить критерии поиска или даты, или создайте свое объявление"
                   : "Пока нет объявлений по этому маршруту. Попробуйте изменить критерии поиска или даты, или создайте свое объявление"}
               </p>
               <button
@@ -181,12 +181,12 @@ export default function BrowsePage() {
                         {r.kind === "request" ? (
                           <span className="badge-primary">
                             <HiOutlineGift className="w-3 h-3" />
-                            Запрос
+                            Нужна доставка
                           </span>
                         ) : (
                           <span className="badge-success">
                             <HiOutlineTruck className="w-3 h-3" />
-                            Поездка
+                            Могу доставить
                           </span>
                         )}
                       </div>

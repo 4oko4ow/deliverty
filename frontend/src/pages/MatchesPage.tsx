@@ -138,12 +138,12 @@ export default function MatchesPage() {
                     {r.kind === "request" ? (
                       <span className="badge-primary">
                         <HiOutlineGift className="w-3 h-3" />
-                        Запрос
+                        Нужна доставка
                       </span>
                     ) : (
                       <span className="badge-success">
                         <HiOutlineTruck className="w-3 h-3" />
-                        Поездка
+                        Могу доставить
                       </span>
                     )}
                   </div>
