@@ -1,16 +1,19 @@
-import React, { useState } from "react";
+import { useState } from "react";
 import AirportInput from "../components/AirportInput";
 import { api } from "../lib/api";
-import { Link } from "react-router-dom";
-import { HiOutlineSearch, HiOutlineLocationMarker, HiOutlineCalendar, HiOutlineCube, HiArrowRight, HiOutlineExclamationCircle } from "react-icons/hi";
+import { Link, useNavigate } from "react-router-dom";
+import { HiOutlineSearch, HiOutlineLocationMarker, HiOutlineCalendar, HiOutlineCube, HiArrowRight, HiOutlineExclamationCircle, HiOutlineSparkles } from "react-icons/hi";
 import { HiOutlineTruck, HiOutlineGift } from "react-icons/hi2";
 import { formatItem, formatWeight } from "../lib/translations";
 
 export default function BrowsePage() {
+  const navigate = useNavigate();
   const [from, setFrom] = useState("");
   const [to, setTo] = useState("");
   const [kindFilter, setKindFilter] = useState<"all" | "request" | "trip">("all");
   const [rows, setRows] = useState<any[]>([]);
+  const [matchesMap, setMatchesMap] = useState<Record<number, any[]>>({});
+  const [loadingMatches, setLoadingMatches] = useState<Record<number, boolean>>({});
   const [loading, setLoading] = useState(false);
   const [searched, setSearched] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -23,11 +26,24 @@ export default function BrowsePage() {
     setError(null);
     setLoading(true);
     setSearched(true);
+    setMatchesMap({});
     try {
-      const result = await api.listPubs(from, to, kindFilter === "all" ? undefined : kindFilter);
+      // Если выбран конкретный тип, ищем противоположный (совпадения)
+      let searchKind: string | undefined;
+      if (kindFilter === "request") {
+        searchKind = "trip"; // Ищем поездки для запросов
+      } else if (kindFilter === "trip") {
+        searchKind = "request"; // Ищем запросы для поездок
+      }
+
+      const result: any = await api.listPubs(from, to, searchKind);
       if (Array.isArray(result)) {
         setRows(result);
-      } else if (result.error) {
+        // Если выбран конкретный тип, загружаем совпадения для каждого результата
+        if (kindFilter !== "all" && result.length > 0) {
+          loadMatchesForResults(result);
+        }
+      } else if (result && typeof result === "object" && "error" in result) {
         setError(result.error || "Ошибка при поиске");
         setRows([]);
       } else {
@@ -39,6 +55,30 @@ export default function BrowsePage() {
     } finally {
       setLoading(false);
     }
+  }
+
+  async function loadMatchesForResults(results: any[]) {
+    const loadingState: Record<number, boolean> = {};
+    results.forEach(r => {
+      loadingState[r.id] = true;
+    });
+    setLoadingMatches(loadingState);
+
+    // Загружаем совпадения для каждого результата параллельно
+    const matchesPromises = results.map(r => api.matches(String(r.id)));
+    const matchesResults = await Promise.all(matchesPromises);
+
+    const newMatchesMap: Record<number, any[]> = {};
+    results.forEach((r, idx) => {
+      if (Array.isArray(matchesResults[idx])) {
+        newMatchesMap[r.id] = matchesResults[idx];
+      } else {
+        newMatchesMap[r.id] = [];
+      }
+    });
+
+    setMatchesMap(newMatchesMap);
+    setLoadingMatches({});
   }
 
   const formatDate = (dateStr: string) => {
@@ -69,22 +109,20 @@ export default function BrowsePage() {
             <button
               type="button"
               onClick={() => setKindFilter("all")}
-              className={`px-3 py-2.5 sm:px-4 sm:py-2 rounded-lg border-2 transition-all text-xs sm:text-sm touch-manipulation min-h-[48px] ${
-                kindFilter === "all"
+              className={`px-3 py-2.5 sm:px-4 sm:py-2 rounded-lg border-2 transition-all text-xs sm:text-sm touch-manipulation min-h-[48px] ${kindFilter === "all"
                   ? "border-primary-500 bg-primary-50 text-primary-900 font-semibold"
                   : "border-gray-200 hover:border-gray-300 active:bg-gray-50 text-gray-600"
-              }`}
+                }`}
             >
               Все
             </button>
             <button
               type="button"
               onClick={() => setKindFilter("request")}
-              className={`px-2 py-2.5 sm:px-4 sm:py-2 rounded-lg border-2 transition-all text-xs sm:text-sm flex items-center justify-center gap-1 sm:gap-1.5 touch-manipulation min-h-[48px] ${
-                kindFilter === "request"
+              className={`px-2 py-2.5 sm:px-4 sm:py-2 rounded-lg border-2 transition-all text-xs sm:text-sm flex items-center justify-center gap-1 sm:gap-1.5 touch-manipulation min-h-[48px] ${kindFilter === "request"
                   ? "border-primary-500 bg-primary-50 text-primary-900 font-semibold"
                   : "border-gray-200 hover:border-gray-300 active:bg-gray-50 text-gray-600"
-              }`}
+                }`}
             >
               <HiOutlineGift className="w-4 h-4 sm:w-4 sm:h-4 flex-shrink-0" />
               <span className="hidden sm:inline">Нужна доставка</span>
@@ -93,11 +131,10 @@ export default function BrowsePage() {
             <button
               type="button"
               onClick={() => setKindFilter("trip")}
-              className={`px-2 py-2.5 sm:px-4 sm:py-2 rounded-lg border-2 transition-all text-xs sm:text-sm flex items-center justify-center gap-1 sm:gap-1.5 touch-manipulation min-h-[48px] ${
-                kindFilter === "trip"
+              className={`px-2 py-2.5 sm:px-4 sm:py-2 rounded-lg border-2 transition-all text-xs sm:text-sm flex items-center justify-center gap-1 sm:gap-1.5 touch-manipulation min-h-[48px] ${kindFilter === "trip"
                   ? "border-primary-500 bg-primary-50 text-primary-900 font-semibold"
                   : "border-gray-200 hover:border-gray-300 active:bg-gray-50 text-gray-600"
-              }`}
+                }`}
             >
               <HiOutlineTruck className="w-4 h-4 sm:w-4 sm:h-4 flex-shrink-0" />
               <span className="hidden sm:inline">Могу доставить</span>
@@ -123,7 +160,7 @@ export default function BrowsePage() {
             </>
           )}
         </button>
-        
+
         {error && (
           <div className="flex items-start gap-2 p-4 bg-red-50 border border-red-200 rounded-lg">
             <HiOutlineExclamationCircle className="w-5 h-5 text-red-600 flex-shrink-0 mt-0.5" />
@@ -147,8 +184,8 @@ export default function BrowsePage() {
                 {kindFilter === "trip"
                   ? "Пока нет людей, которые могут доставить по этому маршруту. Попробуйте изменить критерии поиска или даты, или создайте свое объявление"
                   : kindFilter === "request"
-                  ? "Пока нет объявлений о нужной доставке по этому маршруту. Попробуйте изменить критерии поиска или даты, или создайте свое объявление"
-                  : "Пока нет объявлений по этому маршруту. Попробуйте изменить критерии поиска или даты, или создайте свое объявление"}
+                    ? "Пока нет объявлений о нужной доставке по этому маршруту. Попробуйте изменить критерии поиска или даты, или создайте свое объявление"
+                    : "Пока нет объявлений по этому маршруту. Попробуйте изменить критерии поиска или даты, или создайте свое объявление"}
               </p>
               <button
                 onClick={() => {
@@ -193,7 +230,7 @@ export default function BrowsePage() {
                         )}
                       </div>
                     </div>
-                    
+
                     <div className="flex items-center gap-2 sm:gap-3 mb-4">
                       <div className="flex items-center gap-1.5 sm:gap-2">
                         <div className="p-1.5 bg-primary-50 rounded-lg">
@@ -223,9 +260,66 @@ export default function BrowsePage() {
                       </div>
                     </div>
 
-                    <div className="flex items-center justify-between pt-4 border-t border-gray-100">
-                      <span className="text-xs sm:text-sm text-gray-500">Нажмите, чтобы просмотреть совпадения</span>
-                      <HiArrowRight className="w-4 h-4 sm:w-5 sm:h-5 text-primary-600 flex-shrink-0" />
+                    {/* Show matches if available and kindFilter is set */}
+                    {kindFilter !== "all" && matchesMap[r.id] !== undefined && (
+                      <div className="mt-4 pt-4 border-t border-gray-100">
+                        {loadingMatches[r.id] ? (
+                          <div className="flex items-center gap-2 text-xs text-gray-500">
+                            <div className="w-3 h-3 border-2 border-primary-200 border-t-primary-600 rounded-full animate-spin" />
+                            Поиск совпадений...
+                          </div>
+                        ) : matchesMap[r.id] && matchesMap[r.id].length > 0 ? (
+                          <div className="space-y-2">
+                            <div className="flex items-center gap-2 text-xs font-medium text-gray-700">
+                              <HiOutlineSparkles className="w-4 h-4 text-primary-600" />
+                              Найдено {matchesMap[r.id].length} {matchesMap[r.id].length === 1 ? "совпадение" : matchesMap[r.id].length < 5 ? "совпадения" : "совпадений"}
+                            </div>
+                            <div className="space-y-2">
+                              {matchesMap[r.id].slice(0, 2).map((match: any) => (
+                                <div key={match.other_pub_id} className="p-2 bg-gray-50 rounded-lg text-xs">
+                                  <div className="flex items-center gap-2 mb-1">
+                                    {match.kind === "request" ? (
+                                      <span className="badge-primary text-xs px-1.5 py-0.5">
+                                        <HiOutlineGift className="w-3 h-3" />
+                                        <span>Нужна доставка</span>
+                                      </span>
+                                    ) : (
+                                      <span className="badge-success text-xs px-1.5 py-0.5">
+                                        <HiOutlineTruck className="w-3 h-3" />
+                                        <span>Могу доставить</span>
+                                      </span>
+                                    )}
+                                    <span className="text-primary-600 font-semibold">{match.score}%</span>
+                                  </div>
+                                  <div className="text-gray-600">
+                                    {formatDate(match.date_start)} – {formatDate(match.date_end)}
+                                  </div>
+                                </div>
+                              ))}
+                            </div>
+                          </div>
+                        ) : (
+                          <div className="text-xs text-gray-500">
+                            Совпадений по датам не найдено
+                          </div>
+                        )}
+                      </div>
+                    )}
+
+                    <div className="flex items-center justify-between pt-4 border-t border-gray-100 mt-4">
+                      <span className="text-xs sm:text-sm text-gray-500">
+                        {kindFilter === "all" ? "Нажмите, чтобы просмотреть совпадения" : "Открыть детали"}
+                      </span>
+                      <button
+                        className="btn btn-primary text-xs sm:text-sm px-3 py-2"
+                        onClick={(e) => {
+                          e.preventDefault();
+                          navigate(`/matches/${r.id}`);
+                        }}
+                      >
+                        {kindFilter === "all" ? "Совпадения" : "Детали"}
+                        <HiArrowRight className="w-4 h-4 ml-1" />
+                      </button>
                     </div>
                   </Link>
                 ))}
