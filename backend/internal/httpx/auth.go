@@ -1,6 +1,7 @@
 package httpx
 
 import (
+	"fmt"
 	"net/http"
 	"os"
 	"strings"
@@ -8,6 +9,7 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/sol/deliverty/backend/internal/auth"
+	"github.com/sol/deliverty/backend/internal/bot"
 )
 
 // getFrontendURL returns the frontend URL for redirects
@@ -99,10 +101,27 @@ func handleTelegramAuth(pool *pgxpool.Pool) gin.HandlerFunc {
 			return
 		}
 
-		// Note: We don't send Telegram notification here because:
-		// - Bots can't send messages to users who haven't started a conversation
-		// - User is logging in via web, not through bot
-		// - Notification will be shown in the web interface instead
+		// Try to send Telegram notification if user has started conversation with bot
+		// Telegram Login Widget notifications are unreliable, so we send our own
+		go func() {
+			tg := bot.New()
+			if tg.Token == "" {
+				return
+			}
+
+			// Try to send a welcome message
+			// This will fail silently if user hasn't started conversation with bot
+			welcomeMsg := "✅ Авторизация успешна! Вы вошли в систему Deliverty."
+			if firstName != "" {
+				welcomeMsg = fmt.Sprintf("✅ Привет, %s! Авторизация успешна. Вы вошли в систему Deliverty.", firstName)
+			}
+			
+			// Use Bot API to send message (will only work if user started conversation)
+			_, _ = tg.API("sendMessage", map[string]any{
+				"chat_id": userID,
+				"text":    welcomeMsg,
+			})
+		}()
 
 		// Return JSON for callback mode, redirect for redirect mode
 		if isCallbackMode {

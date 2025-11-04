@@ -2,6 +2,7 @@ package httpx
 
 import (
 	"fmt"
+	"log"
 	"net/http"
 	"os"
 
@@ -19,9 +20,16 @@ func RegisterDealRoutes(g *gin.RouterGroup, pool *pgxpool.Pool) {
 func dealDeepLink(pool *pgxpool.Pool) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		dealID := c.Param("id")
+		log.Printf("[DEEPLINK] Generating link for deal %s, user %s", dealID, c.GetString(CtxUserID))
 
 		// ensure caller participates in this deal
 		uid := c.GetString(CtxUserID)
+		if uid == "" {
+			log.Printf("[DEEPLINK] No user ID in context")
+			c.JSON(http.StatusUnauthorized, gin.H{"error": "not authenticated"})
+			return
+		}
+		
 		var ok bool
 		err := pool.QueryRow(c, `
 			SELECT EXISTS(
@@ -33,14 +41,30 @@ func dealDeepLink(pool *pgxpool.Pool) gin.HandlerFunc {
 			  WHERE d.id=$1 AND (ur.tg_user_id=$2::text::bigint OR ut.tg_user_id=$2::text::bigint)
 			)`, dealID, uid).Scan(&ok)
 
-		if err != nil || !ok {
+		if err != nil {
+			log.Printf("[DEEPLINK] Database error: %v", err)
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "database error"})
+			return
+		}
+		
+		if !ok {
+			log.Printf("[DEEPLINK] User %s is not a participant of deal %s", uid, dealID)
 			c.JSON(http.StatusForbidden, gin.H{"error": "not allowed"})
 			return
 		}
 
 		botName := os.Getenv("TG_BOT_NAME")
+		if botName == "" {
+			log.Printf("[DEEPLINK] TG_BOT_NAME not set")
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "bot not configured"})
+			return
+		}
+		
 		payload := fmt.Sprintf("deal:%s", dealID)
-		link := fmt.Sprintf("https://t.me/%s?start=%s:%s", botName, payload, bot.Sign(payload))
+		sig := bot.Sign(payload)
+		link := fmt.Sprintf("https://t.me/%s?start=%s:%s", botName, payload, sig)
+		
+		log.Printf("[DEEPLINK] Generated link: payload=%q, sig=%q, link=%q", payload, sig, link)
 
 		c.JSON(http.StatusOK, gin.H{"url": link})
 	}

@@ -2,6 +2,7 @@ package httpx
 
 import (
 	"fmt"
+	"log"
 	"net/http"
 	"strings"
 
@@ -35,6 +36,8 @@ func registerBotRoutes(r *gin.Engine, pool *pgxpool.Pool) {
 		tg := bot.New()
 		text := strings.TrimSpace(up.Message.Text)
 
+		log.Printf("[BOT] Received message from user %d: %q", up.Message.From.ID, text)
+
 		// Handle /start command
 		if strings.HasPrefix(text, "/start") {
 			// /start connect - user connecting from web
@@ -62,12 +65,40 @@ func registerBotRoutes(r *gin.Engine, pool *pgxpool.Pool) {
 
 			// /start deal:<id>:<sig>
 			if strings.HasPrefix(text, "/start ") {
-				parts := strings.Split(strings.TrimPrefix(text, "/start "), ":")
-				if len(parts) != 3 || parts[0] != "deal" || !bot.Verify(parts[0]+":"+parts[1], parts[2]) {
-					_, _ = tg.API("sendMessage", gin.H{"chat_id": up.Message.Chat.ID, "text": "Неверная ссылка"})
+				startParam := strings.TrimPrefix(text, "/start ")
+				log.Printf("[BOT] Processing deep-link: %q", startParam)
+				
+				parts := strings.Split(startParam, ":")
+				log.Printf("[BOT] Split parts: %v (len=%d)", parts, len(parts))
+				
+				if len(parts) != 3 {
+					log.Printf("[BOT] Invalid parts count: expected 3, got %d", len(parts))
+					_, _ = tg.API("sendMessage", gin.H{"chat_id": up.Message.Chat.ID, "text": "Неверная ссылка: неверный формат"})
 					c.Status(http.StatusOK)
 					return
 				}
+				
+				if parts[0] != "deal" {
+					log.Printf("[BOT] Invalid prefix: expected 'deal', got %q", parts[0])
+					_, _ = tg.API("sendMessage", gin.H{"chat_id": up.Message.Chat.ID, "text": "Неверная ссылка: неверный тип"})
+					c.Status(http.StatusOK)
+					return
+				}
+				
+				payload := parts[0] + ":" + parts[1]
+				sig := parts[2]
+				isValid := bot.Verify(payload, sig)
+				log.Printf("[BOT] Verifying signature: payload=%q, sig=%q, valid=%v", payload, sig, isValid)
+				
+				if !isValid {
+					log.Printf("[BOT] Signature verification failed")
+					_, _ = tg.API("sendMessage", gin.H{"chat_id": up.Message.Chat.ID, "text": "Неверная ссылка: подпись неверна"})
+					c.Status(http.StatusOK)
+					return
+				}
+
+				dealID := parts[1]
+				log.Printf("[BOT] Checking if user %d is participant of deal %s", up.Message.From.ID, dealID)
 
 				// Ensure participant belongs to deal
 				var ok bool
@@ -79,14 +110,25 @@ func registerBotRoutes(r *gin.Engine, pool *pgxpool.Pool) {
 				      JOIN publication pt ON pt.id=d.trip_pub_id
 				      JOIN app_user ut ON ut.id=pt.user_id
 				    WHERE d.id=$1 AND (ur.tg_user_id=$2 OR ut.tg_user_id=$2)
-				  )`, parts[1], up.Message.From.ID).Scan(&ok)
+				  )`, dealID, up.Message.From.ID).Scan(&ok)
 
-				if err != nil || !ok {
+				if err != nil {
+					log.Printf("[BOT] Database error checking participant: %v", err)
+					_, _ = tg.API("sendMessage", gin.H{"chat_id": up.Message.Chat.ID, "text": "Ошибка при проверке участника"})
+					c.Status(http.StatusOK)
+					return
+				}
+				
+				log.Printf("[BOT] User %d is participant: %v", up.Message.From.ID, ok)
+
+				if !ok {
+					log.Printf("[BOT] User %d is not a participant of deal %s", up.Message.From.ID, dealID)
 					_, _ = tg.API("sendMessage", gin.H{"chat_id": up.Message.Chat.ID, "text": "Вы не являетесь участником"})
 					c.Status(http.StatusOK)
 					return
 				}
 
+				log.Printf("[BOT] Successfully connected user %d to deal %s", up.Message.From.ID, dealID)
 				_, _ = tg.API("sendMessage", gin.H{"chat_id": up.Message.Chat.ID, "text": "Подключено. Отправляйте сообщения сюда для пересылки.\nКоманды: /agree, /done, /cancel"})
 				c.Status(http.StatusOK)
 				return

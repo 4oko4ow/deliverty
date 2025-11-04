@@ -61,8 +61,11 @@ export default function MatchesPage() {
   }, [pubId]);
 
   async function makeDeal(otherPubId: number, otherKind: string) {
+    console.log("[FRONTEND] makeDeal called", { otherPubId, otherKind, pubId });
+    
     // Check authentication before creating deal
     if (!isAuthenticated()) {
+      console.log("[FRONTEND] Not authenticated, redirecting");
       // Save current URL to return after auth
       const returnUrl = `/matches/${pubId}`;
       navigate(`/auth?return=${encodeURIComponent(returnUrl)}`);
@@ -74,30 +77,49 @@ export default function MatchesPage() {
     try {
       const reqId = otherKind === "trip" ? Number(pubId) : otherPubId;
       const tripId = otherKind === "trip" ? otherPubId : Number(pubId);
+      console.log("[FRONTEND] Creating deal", { reqId, tripId });
+      
       const res = await api.createDeal(reqId, tripId);
+      console.log("[FRONTEND] createDeal response", res);
+      
       if (res.error) {
+        console.error("[FRONTEND] createDeal error", res.error);
         setError(res.error || "Ошибка при создании сделки");
         setCreating(null);
       } else if (res.id) {
+        console.log("[FRONTEND] Deal created, getting link for deal ID:", res.id);
         const link = await api.dealLink(res.id);
+        console.log("[FRONTEND] dealLink response", link);
+        
         if (link.url) {
+          console.log("[FRONTEND] Opening Telegram link:", link.url);
           // Mark this deal as created
           setCreatedDeals(prev => new Set(prev).add(otherPubId));
           // Open Telegram link
-          window.open(link.url, "_blank");
+          const opened = window.open(link.url, "_blank");
+          if (!opened) {
+            console.error("[FRONTEND] Popup blocked by browser");
+            setError("Браузер заблокировал открытие Telegram. Разрешите всплывающие окна.");
+            setCreating(null);
+            return;
+          }
+          console.log("[FRONTEND] Telegram link opened successfully");
           // Show success message briefly
           setTimeout(() => {
             setCreating(null);
           }, 1000);
         } else {
-          setError("Не удалось получить ссылку на чат");
+          console.error("[FRONTEND] No URL in dealLink response", link);
+          setError(link.error || "Не удалось получить ссылку на чат");
           setCreating(null);
         }
       } else {
+        console.error("[FRONTEND] No deal ID in response", res);
         setError("Не удалось создать сделку");
         setCreating(null);
       }
     } catch (err) {
+      console.error("[FRONTEND] Exception in makeDeal", err);
       setError("Произошла ошибка. Попробуйте еще раз.");
       setCreating(null);
     }
