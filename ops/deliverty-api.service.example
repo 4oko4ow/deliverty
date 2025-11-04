@@ -1,0 +1,30 @@
+[Unit]
+Description=Deliverty API
+After=network.target postgresql.service
+Requires=postgresql.service
+
+[Service]
+Type=simple
+Environment=DATABASE_URL=postgres://postgres:postgres@localhost:5432/deliverty?sslmode=disable
+Environment=HTTP_ADDR=:8080
+Environment=TG_BOT_TOKEN=your-bot-token-here
+Environment=TG_BOT_NAME=deliverty_bot
+Environment=TG_DEEPLINK_SECRET=your-secret-here
+ExecStart=/srv/deliverty-api/api
+Restart=always
+RestartSec=5
+User=www-data
+Group=www-data
+WorkingDirectory=/srv/deliverty-api
+
+# Security
+NoNewPrivileges=true
+PrivateTmp=true
+
+# Logging
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=deliverty-api
+
+[Install]
+WantedBy=multi-user.target
