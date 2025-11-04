@@ -40,6 +40,13 @@ export const api = {
     return handleResponse(response);
   },
 
+  getPub: async (id: string) => {
+    const response = await fetch(`${BASE}/publications/${id}`, { 
+      headers: tgHeader() 
+    });
+    return handleResponse(response);
+  },
+
   matches: async (pubId: string) => {
     const response = await fetch(`${BASE}/matches?pub_id=${pubId}`, { 
       headers: tgHeader() 

@@ -3,6 +3,7 @@ package httpx
 import (
 	"net/http"
 	"regexp"
+	"strconv"
 	"time"
 
 	"github.com/gin-gonic/gin"
@@ -29,6 +30,7 @@ type PubIn struct {
 func RegisterPublicationRoutes(g *gin.RouterGroup, pool *pgxpool.Pool) {
 	g.POST("/publications", RateLimit(20), createPublication(pool))
 	g.GET("/publications", listPublications(pool))
+	g.GET("/publications/:id", getPublication(pool))
 }
 
 func createPublication(pool *pgxpool.Pool) gin.HandlerFunc {
@@ -168,6 +170,46 @@ func listPublications(pool *pgxpool.Pool) gin.HandlerFunc {
 		}
 
 		c.JSON(http.StatusOK, out)
+	}
+}
+
+func getPublication(pool *pgxpool.Pool) gin.HandlerFunc {
+	return func(c *gin.Context) {
+		idStr := c.Param("id")
+		id, err := strconv.ParseInt(idStr, 10, 64)
+		if err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "invalid id"})
+			return
+		}
+
+		type Pub struct {
+			ID          int64  `json:"id"`
+			Kind        string `json:"kind"`
+			From        string `json:"from_iata"`
+			To          string `json:"to_iata"`
+			DateStart   string `json:"date_start"`
+			DateEnd     string `json:"date_end"`
+			Item        string `json:"item"`
+			Weight      string `json:"weight"`
+			RewardHint  *int   `json:"reward_hint"`
+			Description string `json:"description"`
+		}
+
+		var p Pub
+		var ds, de time.Time
+		err = pool.QueryRow(c, `
+			SELECT id, kind, from_iata, to_iata, date_start, date_end, item, weight, reward_hint, description
+			FROM publication
+			WHERE id=$1 AND is_active
+		`, id).Scan(&p.ID, &p.Kind, &p.From, &p.To, &ds, &de, &p.Item, &p.Weight, &p.RewardHint, &p.Description)
+		if err != nil {
+			c.JSON(http.StatusNotFound, gin.H{"error": "publication not found"})
+			return
+		}
+
+		p.DateStart = ds.Format("2006-01-02")
+		p.DateEnd = de.Format("2006-01-02")
+		c.JSON(http.StatusOK, p)
 	}
 }
 
