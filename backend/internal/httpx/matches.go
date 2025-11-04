@@ -29,13 +29,13 @@ type MatchOut struct {
 }
 
 func RegisterMatchRoutes(g *gin.RouterGroup, pool *pgxpool.Pool) {
-	g.GET("/matches", findMatches(pool))   // ?pub_id=
-	g.POST("/deals", createDeal(pool))     // {request_pub_id, trip_pub_id}
+	g.GET("/matches", findMatches(pool)) // ?pub_id=
+	g.POST("/deals", createDeal(pool))   // {request_pub_id, trip_pub_id}
 }
 
 // RegisterMatchAuthRoutes registers only auth-required match routes
 func RegisterMatchAuthRoutes(g *gin.RouterGroup, pool *pgxpool.Pool) {
-	g.POST("/deals", createDeal(pool))     // {request_pub_id, trip_pub_id}
+	g.POST("/deals", createDeal(pool)) // {request_pub_id, trip_pub_id}
 }
 
 func findMatches(pool *pgxpool.Pool) gin.HandlerFunc {
@@ -70,17 +70,22 @@ func findMatches(pool *pgxpool.Pool) gin.HandlerFunc {
 			opp = "request"
 		}
 
+		// Get user_id of the anchor publication to exclude own publications
+		var anchorUserID int64
+		_ = pool.QueryRow(c, `SELECT user_id FROM publication WHERE id=$1`, pubID).Scan(&anchorUserID)
+
 		rows, err := pool.Query(c, `
 			SELECT id, kind, from_iata, to_iata, date_start, date_end, item, weight
 			FROM publication
 			WHERE is_active
 			  AND id != $1
+			  AND user_id != $7
 			  AND kind=$2::pub_type
 			  AND from_iata=$3 AND to_iata=$4
 			  AND NOT (date_end < $5 OR date_start > $6)
 			ORDER BY created_at DESC
 			LIMIT 50
-		`, pubID, opp, from, to, aStart, aEnd)
+		`, pubID, opp, from, to, aStart, aEnd, anchorUserID)
 		if err != nil {
 			c.JSON(http.StatusInternalServerError, gin.H{"error": "db"})
 			return
@@ -206,7 +211,7 @@ func createDeal(pool *pgxpool.Pool) gin.HandlerFunc {
 				"inline_keyboard": [][]gin.H{
 					{
 						{
-							"text":         "Начать общение",
+							"text":          "Начать общение",
 							"callback_data": fmt.Sprintf("start_deal:%s", startParam),
 						},
 					},

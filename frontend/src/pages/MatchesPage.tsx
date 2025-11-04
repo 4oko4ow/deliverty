@@ -20,34 +20,54 @@ export default function MatchesPage() {
     setLoading(true);
     setError(null);
 
-    // Fetch both publication and matches in parallel
-    Promise.all([
-      api.getPub(pubId!),
-      api.matches(pubId!)
-    ]).then(([pubData, matchesData]) => {
+    // Fetch publication first
+    api.getPub(pubId!).then((pubData) => {
       if (a) {
-        let hasPubError = false;
-
-        // Handle publication
         if (pubData.error) {
           setError(pubData.error || "Объявление не найдено");
-          hasPubError = true;
+          setLoading(false);
         } else {
           setPub(pubData);
-        }
 
-        // Handle matches
-        if (Array.isArray(matchesData)) {
-          setRows(matchesData);
-        } else if (matchesData.error) {
-          if (!hasPubError) { // Don't override publication error
-            setError(matchesData.error || "Ошибка при поиске совпадений");
+          // If publication is "trip" (Лечу), show other trips instead of matches
+          // This makes sense when user searched "Я ищу" and wants to see all available travelers
+          if (pubData.kind === "trip") {
+            // Fetch other trips with same route (excluding current one)
+            api.listPubs(pubData.from_iata, pubData.to_iata, "trip").then((tripsData) => {
+              if (a && Array.isArray(tripsData)) {
+                // Filter out current publication and map to match format
+                const otherTrips = tripsData
+                  .filter((t: any) => t.id !== pubData.id)
+                  .map((t: any) => ({
+                    other_pub_id: t.id,
+                    kind: t.kind,
+                    from_iata: t.from_iata,
+                    to_iata: t.to_iata,
+                    date_start: t.date_start,
+                    date_end: t.date_end,
+                    item: t.item,
+                    weight: t.weight,
+                    score: 50, // Default score for same route
+                  }));
+                setRows(otherTrips);
+                setLoading(false);
+              } else {
+                setRows([]);
+                setLoading(false);
+              }
+            });
+          } else {
+            // For "request" publications, show matches as usual
+            api.matches(pubId!).then((matchesData) => {
+              if (a && Array.isArray(matchesData)) {
+                setRows(matchesData);
+              } else {
+                setRows([]);
+              }
+              setLoading(false);
+            });
           }
-          setRows([]);
-        } else {
-          setRows([]);
         }
-        setLoading(false);
       }
     }).catch(() => {
       if (a) {
@@ -280,12 +300,12 @@ export default function MatchesPage() {
                 <p className="text-sm sm:text-base text-gray-600 mb-1">
                   {pub.kind === "request"
                     ? "Пока нет путешественников, которые летят по этому маршруту в нужные даты."
-                    : "Пока нет запросов на доставку по этому маршруту в ваши даты."}
+                    : "Пока нет других путешественников по этому маршруту."}
                 </p>
                 <p className="text-xs sm:text-sm text-gray-500 mb-4">
                   {pub.kind === "request"
                     ? "Создайте объявление о поездке, чтобы вас могли найти другие пользователи."
-                    : "Создайте запрос на доставку, чтобы вас могли найти путешественники."}
+                    : "Используйте кнопку выше для связи с этим путешественником или создайте свой запрос на доставку."}
                 </p>
               </div>
               <div className="flex flex-col sm:flex-row gap-3 justify-center">
@@ -321,7 +341,7 @@ export default function MatchesPage() {
                     <p className="text-xs text-green-700">
                       {pub?.kind === "request"
                         ? "Ниже список путешественников, которые могут доставить ваш запрос. Выберите подходящего и откройте чат в Telegram."
-                        : "Это совпадения этого объявления с другими запросами. Если у вас есть запрос на доставку, используйте кнопку выше для связи."}
+                        : "Ниже список других путешественников по этому маршруту. Выберите подходящего или используйте кнопку выше для связи с этим путешественником."}
                     </p>
                   </div>
                 </div>
@@ -350,10 +370,10 @@ export default function MatchesPage() {
                             <span className="text-xs sm:text-xs">Лечу, могу доставить</span>
                           </span>
                         ) : (
-                          // Если исходное объявление "Лечу", совпадения - это те, кто "Ищу"
-                          <span className="badge-primary">
-                            <HiOutlineGift className="w-3 h-3 sm:w-3 sm:h-3" />
-                            <span className="text-xs sm:text-xs">Ищу кто летит</span>
+                          // Если исходное объявление "Лечу", показываем других путешественников
+                          <span className="badge-success">
+                            <HiOutlineTruck className="w-3 h-3 sm:w-3 sm:h-3" />
+                            <span className="text-xs sm:text-xs">Лечу, могу доставить</span>
                           </span>
                         )}
                       </div>
