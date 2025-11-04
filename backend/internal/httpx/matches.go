@@ -2,6 +2,7 @@ package httpx
 
 import (
 	"net/http"
+	"strconv"
 	"time"
 
 	"github.com/gin-gonic/gin"
@@ -28,16 +29,22 @@ func RegisterMatchRoutes(g *gin.RouterGroup, pool *pgxpool.Pool) {
 
 func findMatches(pool *pgxpool.Pool) gin.HandlerFunc {
 	return func(c *gin.Context) {
-		pubID := c.Query("pub_id")
-		if pubID == "" {
+		pubIDStr := c.Query("pub_id")
+		if pubIDStr == "" {
 			c.JSON(http.StatusBadRequest, gin.H{"error": "pub_id required"})
+			return
+		}
+
+		pubID, err := strconv.ParseInt(pubIDStr, 10, 64)
+		if err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "invalid pub_id"})
 			return
 		}
 
 		// Load anchor pub
 		var kind, from, to, item, weight string
 		var aStart, aEnd time.Time
-		err := pool.QueryRow(c, `
+		err = pool.QueryRow(c, `
 			SELECT kind, from_iata, to_iata, date_start, date_end, item, weight
 			FROM publication WHERE id=$1 AND is_active`, pubID).
 			Scan(&kind, &from, &to, &aStart, &aEnd, &item, &weight)
@@ -56,12 +63,13 @@ func findMatches(pool *pgxpool.Pool) gin.HandlerFunc {
 			SELECT id, kind, from_iata, to_iata, date_start, date_end, item, weight
 			FROM publication
 			WHERE is_active
-			  AND kind=$1::pub_type
-			  AND from_iata=$2 AND to_iata=$3
-			  AND NOT (date_end < $4 OR date_start > $5)
+			  AND id != $1
+			  AND kind=$2::pub_type
+			  AND from_iata=$3 AND to_iata=$4
+			  AND NOT (date_end < $5 OR date_start > $6)
 			ORDER BY created_at DESC
 			LIMIT 50
-		`, opp, from, to, aStart, aEnd)
+		`, pubID, opp, from, to, aStart, aEnd)
 		if err != nil {
 			c.JSON(http.StatusInternalServerError, gin.H{"error": "db"})
 			return

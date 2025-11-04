@@ -21,8 +21,15 @@ type Migration struct {
 
 // Run applies all pending migrations to the database
 func Run(ctx context.Context, pool *pgxpool.Pool) error {
+	// Acquire a single connection for all migration operations to avoid prepared statement conflicts
+	conn, err := pool.Acquire(ctx)
+	if err != nil {
+		return fmt.Errorf("failed to acquire connection: %w", err)
+	}
+	defer conn.Release()
+
 	// Create migrations table if it doesn't exist
-	if err := createMigrationsTable(ctx, pool); err != nil {
+	if err := createMigrationsTable(ctx, conn); err != nil {
 		return fmt.Errorf("failed to create migrations table: %w", err)
 	}
 
@@ -33,7 +40,7 @@ func Run(ctx context.Context, pool *pgxpool.Pool) error {
 	}
 
 	// Get already applied migrations
-	applied, err := getAppliedMigrations(ctx, pool)
+	applied, err := getAppliedMigrations(ctx, conn)
 	if err != nil {
 		return fmt.Errorf("failed to get applied migrations: %w", err)
 	}
@@ -46,7 +53,7 @@ func Run(ctx context.Context, pool *pgxpool.Pool) error {
 		}
 
 		log.Printf("Applying migration %s...", migration.Name)
-		if err := applyMigration(ctx, pool, migration); err != nil {
+		if err := applyMigration(ctx, conn, migration); err != nil {
 			return fmt.Errorf("failed to apply migration %s: %w", migration.Name, err)
 		}
 		log.Printf("Migration %s applied successfully", migration.Name)
@@ -56,14 +63,14 @@ func Run(ctx context.Context, pool *pgxpool.Pool) error {
 }
 
 // createMigrationsTable creates the schema_migrations table if it doesn't exist
-func createMigrationsTable(ctx context.Context, pool *pgxpool.Pool) error {
+func createMigrationsTable(ctx context.Context, conn *pgxpool.Conn) error {
 	query := `
 		CREATE TABLE IF NOT EXISTS schema_migrations (
 			name TEXT PRIMARY KEY,
 			applied_at TIMESTAMPTZ NOT NULL DEFAULT now()
 		)
 	`
-	_, err := pool.Exec(ctx, query)
+	_, err := conn.Exec(ctx, query)
 	return err
 }
 
@@ -160,9 +167,9 @@ func findMigrationsDir() string {
 }
 
 // getAppliedMigrations returns a map of already applied migration names
-func getAppliedMigrations(ctx context.Context, pool *pgxpool.Pool) (map[string]bool, error) {
+func getAppliedMigrations(ctx context.Context, conn *pgxpool.Conn) (map[string]bool, error) {
 	query := `SELECT name FROM schema_migrations`
-	rows, err := pool.Query(ctx, query)
+	rows, err := conn.Query(ctx, query)
 	if err != nil {
 		return nil, err
 	}
@@ -181,9 +188,9 @@ func getAppliedMigrations(ctx context.Context, pool *pgxpool.Pool) (map[string]b
 }
 
 // applyMigration applies a single migration and records it
-func applyMigration(ctx context.Context, pool *pgxpool.Pool, migration Migration) error {
+func applyMigration(ctx context.Context, conn *pgxpool.Conn, migration Migration) error {
 	// Begin transaction
-	tx, err := pool.Begin(ctx)
+	tx, err := conn.Begin(ctx)
 	if err != nil {
 		return err
 	}
