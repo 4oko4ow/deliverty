@@ -67,19 +67,148 @@ export default function BrowsePage() {
     try {
       // If user searches "Я ищу" (request), they see "trip" results
       // To create deal, we need user's request publication
-      // For MVP: just navigate to create request with pre-filled data
       if (kindFilter === "request") {
-        navigate(`/publish?kind=request&from=${resultPub.from_iata}&to=${resultPub.to_iata}&date_start=${resultPub.date_start}&date_end=${resultPub.date_end}&create_deal_with=${resultPub.id}`);
-        setCreating(null);
-        return;
+        // Try to find user's own request first
+        const myRequests: any = await api.listPubs(resultPub.from_iata, resultPub.to_iata, "request");
+
+        let myRequestId: number;
+
+        if (Array.isArray(myRequests) && myRequests.length > 0) {
+          // User has own request, use it
+          myRequestId = myRequests[0].id;
+        } else {
+          // No own request found, create minimal one automatically
+          const newPub: any = await api.createPub({
+            kind: "request",
+            from_iata: resultPub.from_iata,
+            to_iata: resultPub.to_iata,
+            date_start: resultPub.date_start,
+            date_end: resultPub.date_end,
+            item: resultPub.item || "documents",
+            weight: resultPub.weight || "envelope",
+            description: ""
+          });
+
+          if (newPub.error || !newPub.id) {
+            setError(newPub.error || "Не удалось создать объявление");
+            setCreating(null);
+            return;
+          }
+
+          myRequestId = newPub.id;
+        }
+
+        // Create deal with automatically created or existing request
+        const res = await api.createDeal(myRequestId, resultPub.id);
+
+        if (res.error) {
+          setError(res.error || "Не удалось создать сделку");
+          setCreating(null);
+          return;
+        }
+
+        if (res.id) {
+          // Get Telegram link and open it
+          const link = await api.dealLink(res.id);
+          if (link.url) {
+            const isMobile = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
+            let telegramUrl = link.url;
+
+            if (isMobile) {
+              const urlObj = new URL(link.url);
+              const startParam = urlObj.searchParams.get('start');
+              if (startParam) {
+                telegramUrl = `tg://resolve?domain=${link.url.split('t.me/')[1].split('?')[0]}&start=${startParam}`;
+              }
+            }
+
+            window.open(telegramUrl, "_blank");
+            setCreating(null);
+
+            // Show success message briefly
+            setTimeout(() => {
+              setError(null);
+            }, 2000);
+            return;
+          } else {
+            setError(link.error || "Не удалось получить ссылку на чат");
+            setCreating(null);
+            return;
+          }
+        }
       }
 
       // If user searches "Я лечу" (trip), they see "request" results
       // To create deal, we need user's trip publication
       if (kindFilter === "trip") {
-        navigate(`/publish?kind=trip&from=${resultPub.from_iata}&to=${resultPub.to_iata}&date_start=${resultPub.date_start}&date_end=${resultPub.date_end}&create_deal_with=${resultPub.id}`);
-        setCreating(null);
-        return;
+        // Try to find user's own trip first
+        const myTrips: any = await api.listPubs(resultPub.from_iata, resultPub.to_iata, "trip");
+
+        let myTripId: number;
+
+        if (Array.isArray(myTrips) && myTrips.length > 0) {
+          // User has own trip, use it
+          myTripId = myTrips[0].id;
+        } else {
+          // No own trip found, create minimal one automatically
+          const newPub: any = await api.createPub({
+            kind: "trip",
+            from_iata: resultPub.from_iata,
+            to_iata: resultPub.to_iata,
+            date_start: resultPub.date_start,
+            date_end: resultPub.date_end,
+            item: resultPub.item || "documents",
+            weight: resultPub.weight || "envelope",
+            description: ""
+          });
+
+          if (newPub.error || !newPub.id) {
+            setError(newPub.error || "Не удалось создать объявление");
+            setCreating(null);
+            return;
+          }
+
+          myTripId = newPub.id;
+        }
+
+        // Create deal with automatically created or existing trip
+        const res = await api.createDeal(resultPub.id, myTripId);
+
+        if (res.error) {
+          setError(res.error || "Не удалось создать сделку");
+          setCreating(null);
+          return;
+        }
+
+        if (res.id) {
+          // Get Telegram link and open it
+          const link = await api.dealLink(res.id);
+          if (link.url) {
+            const isMobile = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
+            let telegramUrl = link.url;
+
+            if (isMobile) {
+              const urlObj = new URL(link.url);
+              const startParam = urlObj.searchParams.get('start');
+              if (startParam) {
+                telegramUrl = `tg://resolve?domain=${link.url.split('t.me/')[1].split('?')[0]}&start=${startParam}`;
+              }
+            }
+
+            window.open(telegramUrl, "_blank");
+            setCreating(null);
+
+            // Show success message briefly
+            setTimeout(() => {
+              setError(null);
+            }, 2000);
+            return;
+          } else {
+            setError(link.error || "Не удалось получить ссылку на чат");
+            setCreating(null);
+            return;
+          }
+        }
       }
     } catch (err) {
       console.error("[BrowsePage] makeDeal error", err);
@@ -265,7 +394,7 @@ export default function BrowsePage() {
                       </div>
                     </div>
 
-                    {r.description && (
+                    {r.description && r.description.trim() && (
                       <div className="mb-4 pt-4 border-t border-gray-100">
                         <p className="text-sm text-gray-700 whitespace-pre-wrap line-clamp-2">{r.description}</p>
                       </div>
@@ -284,7 +413,7 @@ export default function BrowsePage() {
                           </>
                         ) : (
                           <>
-                            {kindFilter === "request" ? "Создать запрос и связаться" : "Создать объявление и связаться"}
+                            Открыть чат в Telegram
                           </>
                         )}
                       </button>
