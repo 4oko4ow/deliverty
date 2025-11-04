@@ -83,7 +83,7 @@ func findMatches(pool *pgxpool.Pool) gin.HandlerFunc {
 			if kind == "request" {
 				ok = match.WeightOK(weight, w) // trip w must fit request weight
 			} else {
-				ok = match.WeightOK(it, weight) // anchor trip must fit request weight
+				ok = match.WeightOK(w, weight) // anchor trip capacity (weight) must fit request weight (w)
 			}
 			if !ok {
 				continue

@@ -207,4 +207,3 @@ func applyMigration(ctx context.Context, pool *pgxpool.Pool, migration Migration
 
 	return nil
 }
-
