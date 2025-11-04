@@ -6,7 +6,7 @@
 
 | Variable | Required | Description | Example |
 |----------|----------|-------------|---------|
-| `DATABASE_URL` | ✅ **Required** | Supabase Postgres connection string | `postgresql://postgres:[PASSWORD]@[PROJECT].supabase.co:5432/postgres?sslmode=require` |
+| `DATABASE_URL` | ✅ **Required** | Supabase Postgres connection string. **Use Connection Pooling URL (port 6543) to avoid IPv6 issues** | `postgresql://postgres:[PASSWORD]@[PROJECT].supabase.co:6543/postgres?sslmode=require` |
 | `TG_BOT_TOKEN` | ✅ **Required** | Telegram bot token from [@BotFather](https://t.me/BotFather) | `123456:ABC-your-bot-token` |
 | `TG_BOT_NAME` | ✅ **Required** | Telegram bot username (without @) | `deliverty_bot` |
 | `TG_DEEPLINK_SECRET` | ✅ **Required** | Random secret string for deep link signing | `your-random-secret-string-here` |

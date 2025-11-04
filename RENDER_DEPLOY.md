@@ -160,6 +160,31 @@ Alternatively, if using Blueprint:
 
 ### Database connection errors
 
+#### IPv6 Network Unreachable Error
+
+If you see errors like `dial tcp [2a05:d018:...]:5432: connect: network is unreachable`, Supabase is returning an IPv6 address but Render doesn't support IPv6.
+
+**Solutions:**
+
+1. **Use Supabase Connection Pooling (Recommended):**
+   - In Supabase Dashboard → Settings → Database
+   - Use the "Connection pooling" URL (port 6543) instead of direct connection
+   - Format: `postgresql://postgres:[PASSWORD]@[PROJECT].supabase.co:6543/postgres?sslmode=require`
+   - This usually uses IPv4
+
+2. **Force IPv4 in connection string:**
+   - Add `?host=[PROJECT].supabase.co` to explicitly use the hostname
+   - Or use the Transaction Pooler mode URL from Supabase
+
+3. **Code fix (already applied):**
+   - The code now forces IPv4 connections via `tcp4` dialer
+   - Redeploy after code update
+
+4. **Check Supabase firewall:**
+   - Supabase Dashboard → Settings → Database → Network Restrictions
+   - Allow connections from all IPs (0.0.0.0/0) or specific Render IPs
+   - Connection pooling URLs don't require firewall changes
+
 - Verify Supabase connection string is correct
 - Check Supabase firewall settings (allow connections from Render IPs)
 - Verify database exists and migrations are run
