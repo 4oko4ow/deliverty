@@ -1,5 +1,8 @@
 version: "3.9"
 
+# Docker Compose for LOCAL DEVELOPMENT ONLY
+# Production uses Supabase Postgres - set DATABASE_URL environment variable to your Supabase connection string
+
 services:
   db:
     image: postgres:16-alpine
@@ -8,7 +11,7 @@ services:
       POSTGRES_PASSWORD: postgres
       POSTGRES_DB: deliverty
     ports:
-      - "5433:5432"
+      - "5433:5432"  # Mapped to 5433 to avoid conflicts with local Postgres
     volumes:
       - dbdata:/var/lib/postgresql/data
       # run our .sql on first boot

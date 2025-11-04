@@ -1,0 +1,22 @@
+services:
+  # Backend API Service
+  - type: web
+    name: deliverty-api
+    env: go
+    region: oregon
+    rootDir: backend
+    buildCommand: go build -o api ./cmd/api
+    startCommand: ./api
+    envVars:
+      - key: DATABASE_URL
+        sync: false  # Set this in Render dashboard to your Supabase Postgres URL
+      - key: TG_BOT_TOKEN
+        sync: false  # Set this in Render dashboard
+      - key: TG_BOT_NAME
+        sync: false  # Set this in Render dashboard (bot username without @)
+      - key: TG_DEEPLINK_SECRET
+        sync: false  # Set this in Render dashboard (random secret string)
+      - key: HTTP_ADDR
+        value: :8080  # Optional, defaults to :8080 or uses PORT if set
+    healthCheckPath: /healthz
+

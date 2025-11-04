@@ -29,9 +29,15 @@ func main() {
 
 	httpx.StartReminders(pool)
 
+	// Support both PORT (Render/Heroku standard) and HTTP_ADDR
 	addr := os.Getenv("HTTP_ADDR")
 	if addr == "" {
-		addr = ":8080"
+		port := os.Getenv("PORT")
+		if port != "" {
+			addr = ":" + port
+		} else {
+			addr = ":8080"
+		}
 	}
 
 	log.Println("listening on", addr)

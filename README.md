@@ -13,7 +13,11 @@ deliverty/
 
 ## Quick Start
 
-### 1. Database Setup
+### Local Development (Docker)
+
+For local development, we use Docker Compose to run PostgreSQL locally.
+
+#### 1. Database Setup (Local Dev)
 
 Start PostgreSQL and Adminer using Docker Compose:
 
@@ -23,7 +27,7 @@ docker compose up -d
 ```
 
 This will:
-- Start PostgreSQL on port `5432`
+- Start PostgreSQL on port `5433` (mapped from container port 5432)
 - Start Adminer (database admin UI) on port `8081`
 - Automatically run migrations on first boot
 
@@ -34,22 +38,22 @@ Access Adminer at: http://localhost:8081
 - Password: `postgres`
 - Database: `deliverty`
 
-### 2. Backend Setup
+#### 2. Backend Setup (Local Dev)
 
-Copy the environment template and configure:
+Create a `.env` file in the `ops/` directory:
 
 ```bash
-cp ops/.env.example ops/.env
-```
-
-Edit `ops/.env` with your values:
-```env
-DATABASE_URL=postgres://postgres:postgres@localhost:5432/deliverty?sslmode=disable
+cd ops
+cat > .env << EOF
+DATABASE_URL=postgres://postgres:postgres@localhost:5433/deliverty?sslmode=disable
 HTTP_ADDR=:8080
 TG_BOT_TOKEN=123456:ABC-your-bot-token
 TG_BOT_NAME=deliverty_bot
 TG_DEEPLINK_SECRET=choose-a-random-long-string
+EOF
 ```
+
+**Note**: For local development, use port `5433` (Docker mapped port).
 
 **Get Telegram Bot Token:**
 1. Talk to [@BotFather](https://t.me/BotFather) on Telegram
@@ -57,6 +61,16 @@ TG_DEEPLINK_SECRET=choose-a-random-long-string
 3. Copy the token (format: `123456:ABC-...`)
 4. Set `TG_BOT_NAME` to your bot's username (without @)
 5. Choose a random string for `TG_DEEPLINK_SECRET`
+
+#### Production (Supabase)
+
+For production, use Supabase Postgres. Set the `DATABASE_URL` environment variable to your Supabase connection string:
+
+```env
+DATABASE_URL=postgresql://postgres:[YOUR-PASSWORD]@[YOUR-PROJECT].supabase.co:5432/postgres?sslmode=require
+```
+
+The application automatically uses the `DATABASE_URL` environment variable - no code changes needed!
 
 Run the backend:
 
@@ -163,9 +177,13 @@ Or run individual test commands manually - see `ops/qa_commands.md` for detailed
 
 ## Production Deployment
 
+### Database Configuration
+
+**Production uses Supabase Postgres** - set the `DATABASE_URL` environment variable to your Supabase connection string. The application automatically uses this variable - no code changes needed!
+
 See `ops/` directory for:
 - `nginx.conf.example` - Nginx reverse proxy configuration
-- `deliverty-api.service.example` - Systemd service file
+- `deliverty-api.service.example` - Systemd service file (set `DATABASE_URL` to your Supabase URL)
 - `deploy.sh` - Automated build and deployment script
 
 **Quick deploy:**
@@ -173,14 +191,21 @@ See `ops/` directory for:
 ./ops/deploy.sh user@your-server.com
 ```
 
+**Important**: Make sure to set `DATABASE_URL` environment variable in your production environment to your Supabase Postgres connection string.
+
 ## Airports Dataset
 
 Import airport data from CSV:
 
 ```bash
-# Download airports.csv (format: iata,name,city,country,tz)
+# For local development (Docker):
 go run ./backend/cmd/airports-load \
-  "postgres://postgres:postgres@localhost:5432/deliverty?sslmode=disable" \
+  "postgres://postgres:postgres@localhost:5433/deliverty?sslmode=disable" \
+  ./ops/airports.csv
+
+# For production (Supabase):
+go run ./backend/cmd/airports-load \
+  "$DATABASE_URL" \
   ./ops/airports.csv
 ```
 

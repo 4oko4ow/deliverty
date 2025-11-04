@@ -1,11 +1,14 @@
 [Unit]
 Description=Deliverty API
-After=network.target postgresql.service
-Requires=postgresql.service
+After=network.target
+# Note: Production uses Supabase Postgres, not local PostgreSQL
 
 [Service]
 Type=simple
-Environment=DATABASE_URL=postgres://postgres:postgres@localhost:5432/deliverty?sslmode=disable
+# Set DATABASE_URL to your Supabase Postgres connection string
+# Get it from: Supabase Dashboard → Project Settings → Database → Connection string
+# Example: postgresql://postgres:[YOUR-PASSWORD]@[PROJECT].supabase.co:5432/postgres?sslmode=require
+Environment=DATABASE_URL=postgresql://postgres:[PASSWORD]@[PROJECT].supabase.co:5432/postgres?sslmode=require
 Environment=HTTP_ADDR=:8080
 Environment=TG_BOT_TOKEN=your-bot-token-here
 Environment=TG_BOT_NAME=deliverty_bot
