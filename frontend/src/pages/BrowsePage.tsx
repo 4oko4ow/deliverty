@@ -9,7 +9,6 @@ import { formatItem, formatWeight } from "../lib/translations";
 export default function BrowsePage() {
   const [from, setFrom] = useState("");
   const [to, setTo] = useState("");
-  const [kind, setKind] = useState<"" | "request" | "trip">("");
   const [rows, setRows] = useState<any[]>([]);
   const [loading, setLoading] = useState(false);
   const [searched, setSearched] = useState(false);
@@ -24,7 +23,7 @@ export default function BrowsePage() {
     setLoading(true);
     setSearched(true);
     try {
-      const result = await api.listPubs(from, to, kind || undefined);
+      const result = await api.listPubs(from, to, "trip");
       if (Array.isArray(result)) {
         setRows(result);
       } else if (result.error) {
@@ -58,32 +57,6 @@ export default function BrowsePage() {
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
           <AirportInput label="Откуда" value={from} onChange={setFrom} />
           <AirportInput label="Куда" value={to} onChange={setTo} />
-        </div>
-        
-        <div>
-          <label className="block text-sm font-medium text-gray-700 mb-2">Тип</label>
-          <div className="flex gap-2">
-            <button
-              onClick={() => setKind("")}
-              className={`flex-1 btn ${kind === "" ? "btn-primary" : "btn-secondary"}`}
-            >
-              Все
-            </button>
-            <button
-              onClick={() => setKind("request")}
-              className={`flex-1 btn ${kind === "request" ? "btn-primary" : "btn-secondary"} flex items-center justify-center gap-2`}
-            >
-              <HiOutlineGift className="w-4 h-4" />
-              Запросы
-            </button>
-            <button
-              onClick={() => setKind("trip")}
-              className={`flex-1 btn ${kind === "trip" ? "btn-primary" : "btn-secondary"} flex items-center justify-center gap-2`}
-            >
-              <HiOutlineTruck className="w-4 h-4" />
-              Поездки
-            </button>
-          </div>
         </div>
 
         <button
@@ -128,7 +101,6 @@ export default function BrowsePage() {
                 onClick={() => {
                   setFrom("");
                   setTo("");
-                  setKind("");
                   setSearched(false);
                   setRows([]);
                 }}
