@@ -35,34 +35,68 @@ func registerBotRoutes(r *gin.Engine, pool *pgxpool.Pool) {
 		tg := bot.New()
 		text := strings.TrimSpace(up.Message.Text)
 
-		// /start deal:<id>:<sig>
-		if strings.HasPrefix(text, "/start ") {
-			parts := strings.Split(strings.TrimPrefix(text, "/start "), ":")
-			if len(parts) != 3 || parts[0] != "deal" || !bot.Verify(parts[0]+":"+parts[1], parts[2]) {
-				_, _ = tg.API("sendMessage", gin.H{"chat_id": up.Message.Chat.ID, "text": "Неверная ссылка"})
+		// Handle /start command
+		if strings.HasPrefix(text, "/start") {
+			// /start connect - user connecting from web
+			if text == "/start connect" {
+				// Check if user exists in database
+				var exists bool
+				_ = pool.QueryRow(c, `
+					SELECT EXISTS(SELECT 1 FROM app_user WHERE tg_user_id=$1)
+				`, up.Message.From.ID).Scan(&exists)
+
+				if exists {
+					_, _ = tg.API("sendMessage", gin.H{
+						"chat_id": up.Message.Chat.ID,
+						"text":    "✅ Отлично! Бот подключен. Теперь вы будете получать уведомления о совпадениях и сделках в Telegram.\n\nИспользуйте веб-сайт для поиска и создания объявлений, а здесь вы будете получать уведомления и можете общаться с другими участниками сделок.",
+					})
+				} else {
+					_, _ = tg.API("sendMessage", gin.H{
+						"chat_id": up.Message.Chat.ID,
+						"text":    "Привет! Сначала авторизуйтесь на веб-сайте Deliverty, а затем вернитесь сюда.",
+					})
+				}
 				c.Status(http.StatusOK)
 				return
 			}
 
-			// Ensure participant belongs to deal
-			var ok bool
-			err := pool.QueryRow(c, `
-			  SELECT EXISTS(
-			    SELECT 1 FROM deal d
-			      JOIN publication pr ON pr.id=d.request_pub_id
-			      JOIN app_user ur ON ur.id=pr.user_id
-			      JOIN publication pt ON pt.id=d.trip_pub_id
-			      JOIN app_user ut ON ut.id=pt.user_id
-			    WHERE d.id=$1 AND (ur.tg_user_id=$2 OR ut.tg_user_id=$2)
-			  )`, parts[1], up.Message.From.ID).Scan(&ok)
+			// /start deal:<id>:<sig>
+			if strings.HasPrefix(text, "/start ") {
+				parts := strings.Split(strings.TrimPrefix(text, "/start "), ":")
+				if len(parts) != 3 || parts[0] != "deal" || !bot.Verify(parts[0]+":"+parts[1], parts[2]) {
+					_, _ = tg.API("sendMessage", gin.H{"chat_id": up.Message.Chat.ID, "text": "Неверная ссылка"})
+					c.Status(http.StatusOK)
+					return
+				}
 
-			if err != nil || !ok {
-				_, _ = tg.API("sendMessage", gin.H{"chat_id": up.Message.Chat.ID, "text": "Вы не являетесь участником"})
+				// Ensure participant belongs to deal
+				var ok bool
+				err := pool.QueryRow(c, `
+				  SELECT EXISTS(
+				    SELECT 1 FROM deal d
+				      JOIN publication pr ON pr.id=d.request_pub_id
+				      JOIN app_user ur ON ur.id=pr.user_id
+				      JOIN publication pt ON pt.id=d.trip_pub_id
+				      JOIN app_user ut ON ut.id=pt.user_id
+				    WHERE d.id=$1 AND (ur.tg_user_id=$2 OR ut.tg_user_id=$2)
+				  )`, parts[1], up.Message.From.ID).Scan(&ok)
+
+				if err != nil || !ok {
+					_, _ = tg.API("sendMessage", gin.H{"chat_id": up.Message.Chat.ID, "text": "Вы не являетесь участником"})
+					c.Status(http.StatusOK)
+					return
+				}
+
+				_, _ = tg.API("sendMessage", gin.H{"chat_id": up.Message.Chat.ID, "text": "Подключено. Отправляйте сообщения сюда для пересылки.\nКоманды: /agree, /done, /cancel"})
 				c.Status(http.StatusOK)
 				return
 			}
 
-			_, _ = tg.API("sendMessage", gin.H{"chat_id": up.Message.Chat.ID, "text": "Подключено. Отправляйте сообщения сюда для пересылки.\nКоманды: /agree, /done, /cancel"})
+			// Plain /start - show welcome message
+			_, _ = tg.API("sendMessage", gin.H{
+				"chat_id": up.Message.Chat.ID,
+				"text":    "Привет! Это бот Deliverty.\n\nИспользуйте веб-сайт для поиска и создания объявлений. Здесь вы будете получать уведомления о совпадениях и сделках.",
+			})
 			c.Status(http.StatusOK)
 			return
 		}

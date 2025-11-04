@@ -1,7 +1,7 @@
-import React, { useEffect } from "react";
+import React, { useEffect, useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import TelegramLogin from "../components/TelegramLogin";
-import { HiOutlinePaperAirplane } from "react-icons/hi";
+import { HiOutlinePaperAirplane, HiOutlineCheckCircle, HiOutlineX } from "react-icons/hi";
 
 const TG_BOT = import.meta.env.VITE_TG_BOT || "your_bot";
 const API_BASE = import.meta.env.VITE_API_BASE || "http://localhost:8080/api";
@@ -9,6 +9,8 @@ const API_BASE = import.meta.env.VITE_API_BASE || "http://localhost:8080/api";
 export default function AuthPage() {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
+  const [showSuccess, setShowSuccess] = useState(false);
+  const [showBotLink, setShowBotLink] = useState(false);
 
   // Check if we're returning from Telegram auth
   useEffect(() => {
@@ -19,9 +21,16 @@ export default function AuthPage() {
     if (authSuccess === "1" && userId) {
       // Save user ID to localStorage
       localStorage.setItem("tg_uid", userId);
-      // Redirect to return URL or home
-      const returnUrl = searchParams.get("return");
-      navigate(returnUrl || "/");
+      // Show success notification
+      setShowSuccess(true);
+      setShowBotLink(true);
+      // Auto-hide after 5 seconds
+      setTimeout(() => {
+        setShowSuccess(false);
+        // Redirect to return URL or home
+        const returnUrl = searchParams.get("return");
+        navigate(returnUrl || "/");
+      }, 5000);
     } else if (error) {
       console.error("Auth error:", error);
     }
@@ -76,6 +85,44 @@ export default function AuthPage() {
             </p>
           </div>
         </div>
+
+        {showSuccess && (
+          <div className="mt-4 p-4 bg-green-50 border border-green-200 rounded-lg">
+            <div className="flex items-start gap-3">
+              <HiOutlineCheckCircle className="w-5 h-5 text-green-600 flex-shrink-0 mt-0.5" />
+              <div className="flex-1">
+                <p className="text-sm font-medium text-green-800 mb-2">
+                  ✅ Авторизация успешна! Вы вошли в систему Deliverty.
+                </p>
+                {showBotLink && (
+                  <div className="mt-3 pt-3 border-t border-green-200">
+                    <p className="text-xs text-green-700 mb-2">
+                      Чтобы получать уведомления о совпадениях и сделках в Telegram:
+                    </p>
+                    <a
+                      href={`https://t.me/${TG_BOT}?start=connect`}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="inline-flex items-center gap-2 px-3 py-1.5 text-xs font-medium text-white bg-green-600 hover:bg-green-700 rounded-lg transition-colors"
+                    >
+                      Открыть бота в Telegram
+                    </a>
+                  </div>
+                )}
+              </div>
+              <button
+                onClick={() => {
+                  setShowSuccess(false);
+                  const returnUrl = searchParams.get("return");
+                  navigate(returnUrl || "/");
+                }}
+                className="text-green-600 hover:text-green-800 flex-shrink-0"
+              >
+                <HiOutlineX className="w-5 h-5" />
+              </button>
+            </div>
+          </div>
+        )}
 
         {searchParams.get("error") && (
           <div className="mt-4 p-4 bg-red-50 border border-red-200 rounded-lg">

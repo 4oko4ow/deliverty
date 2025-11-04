@@ -48,8 +48,13 @@ func handleTelegramAuth(pool *pgxpool.Pool) gin.HandlerFunc {
 			return
 		}
 
+		// Note: We don't send Telegram notification here because:
+		// - Bots can't send messages to users who haven't started a conversation
+		// - User is logging in via web, not through bot
+		// - Notification will be shown in the web interface instead
+
 		// Redirect to frontend with success and user ID
-		// Frontend will save user ID to localStorage
+		// Frontend will save user ID to localStorage and show success notification
 		c.Redirect(http.StatusFound, "/?auth_success=1&user_id="+id)
 	}
 }
