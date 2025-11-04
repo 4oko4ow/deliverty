@@ -50,11 +50,11 @@ export default function BrowsePage() {
   return (
     <div className="space-y-6 animate-fade-in">
       <div className="text-center space-y-2">
-        <h1 className="text-3xl font-bold text-gray-900">Найдите подходящий вариант</h1>
-        <p className="text-gray-600">Поиск объявлений по маршруту</p>
+        <h1 className="text-2xl sm:text-3xl font-bold text-gray-900">Найдите подходящий вариант</h1>
+        <p className="text-sm sm:text-base text-gray-600">Поиск объявлений по маршруту</p>
       </div>
 
-      <div className="card p-6 space-y-4">
+      <div className="card p-4 sm:p-6 space-y-4">
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
           <AirportInput label="Откуда" value={from} onChange={setFrom} />
           <AirportInput label="Куда" value={to} onChange={setTo} />
@@ -62,17 +62,17 @@ export default function BrowsePage() {
 
         {/* Filter by kind */}
         <div>
-          <label className="block text-sm font-medium text-gray-700 mb-2">
+          <label className="block text-sm sm:text-sm font-medium text-gray-700 mb-2">
             Что искать
           </label>
           <div className="grid grid-cols-3 gap-2">
             <button
               type="button"
               onClick={() => setKindFilter("all")}
-              className={`px-4 py-2 rounded-lg border-2 transition-all text-sm ${
+              className={`px-3 py-2.5 sm:px-4 sm:py-2 rounded-lg border-2 transition-all text-xs sm:text-sm touch-manipulation min-h-[48px] ${
                 kindFilter === "all"
                   ? "border-primary-500 bg-primary-50 text-primary-900 font-semibold"
-                  : "border-gray-200 hover:border-gray-300 text-gray-600"
+                  : "border-gray-200 hover:border-gray-300 active:bg-gray-50 text-gray-600"
               }`}
             >
               Все
@@ -80,26 +80,28 @@ export default function BrowsePage() {
             <button
               type="button"
               onClick={() => setKindFilter("request")}
-              className={`px-4 py-2 rounded-lg border-2 transition-all text-sm flex items-center justify-center gap-1.5 ${
+              className={`px-2 py-2.5 sm:px-4 sm:py-2 rounded-lg border-2 transition-all text-xs sm:text-sm flex items-center justify-center gap-1 sm:gap-1.5 touch-manipulation min-h-[48px] ${
                 kindFilter === "request"
                   ? "border-primary-500 bg-primary-50 text-primary-900 font-semibold"
-                  : "border-gray-200 hover:border-gray-300 text-gray-600"
+                  : "border-gray-200 hover:border-gray-300 active:bg-gray-50 text-gray-600"
               }`}
             >
-              <HiOutlineGift className="w-4 h-4" />
-              Нужна доставка
+              <HiOutlineGift className="w-4 h-4 sm:w-4 sm:h-4 flex-shrink-0" />
+              <span className="hidden sm:inline">Нужна доставка</span>
+              <span className="sm:hidden">Нужна</span>
             </button>
             <button
               type="button"
               onClick={() => setKindFilter("trip")}
-              className={`px-4 py-2 rounded-lg border-2 transition-all text-sm flex items-center justify-center gap-1.5 ${
+              className={`px-2 py-2.5 sm:px-4 sm:py-2 rounded-lg border-2 transition-all text-xs sm:text-sm flex items-center justify-center gap-1 sm:gap-1.5 touch-manipulation min-h-[48px] ${
                 kindFilter === "trip"
                   ? "border-primary-500 bg-primary-50 text-primary-900 font-semibold"
-                  : "border-gray-200 hover:border-gray-300 text-gray-600"
+                  : "border-gray-200 hover:border-gray-300 active:bg-gray-50 text-gray-600"
               }`}
             >
-              <HiOutlineTruck className="w-4 h-4" />
-              Могу доставить
+              <HiOutlineTruck className="w-4 h-4 sm:w-4 sm:h-4 flex-shrink-0" />
+              <span className="hidden sm:inline">Могу доставить</span>
+              <span className="sm:hidden">Могу</span>
             </button>
           </div>
         </div>
@@ -138,10 +140,10 @@ export default function BrowsePage() {
               <p className="text-gray-600">Поиск совпадений...</p>
             </div>
           ) : rows.length === 0 ? (
-            <div className="card p-12 text-center">
-              <HiOutlineSearch className="w-16 h-16 text-gray-300 mx-auto mb-4" />
-              <h3 className="text-lg font-semibold text-gray-900 mb-2">Результаты не найдены</h3>
-              <p className="text-gray-600 mb-4">
+            <div className="card p-6 sm:p-12 text-center">
+              <HiOutlineSearch className="w-12 h-12 sm:w-16 sm:h-16 text-gray-300 mx-auto mb-4" />
+              <h3 className="text-base sm:text-lg font-semibold text-gray-900 mb-2">Результаты не найдены</h3>
+              <p className="text-sm sm:text-base text-gray-600 mb-4">
                 {kindFilter === "trip"
                   ? "Пока нет людей, которые могут доставить по этому маршруту. Попробуйте изменить критерии поиска или даты, или создайте свое объявление"
                   : kindFilter === "request"
@@ -164,7 +166,7 @@ export default function BrowsePage() {
           ) : (
             <>
               <div className="flex items-center justify-between">
-                <h2 className="text-xl font-semibold text-gray-900">
+                <h2 className="text-lg sm:text-xl font-semibold text-gray-900">
                   {rows.length} {rows.length === 1 ? "результат" : rows.length < 5 ? "результата" : "результатов"}
                 </h2>
               </div>
@@ -173,48 +175,48 @@ export default function BrowsePage() {
                   <Link
                     key={r.id}
                     to={`/matches/${r.id}`}
-                    className="card-hover p-5 animate-slide-up"
+                    className="card-hover p-4 sm:p-5 animate-slide-up touch-manipulation"
                     style={{ animationDelay: `${idx * 50}ms` }}
                   >
                     <div className="flex items-start justify-between mb-3">
                       <div className="flex items-center gap-2">
                         {r.kind === "request" ? (
                           <span className="badge-primary">
-                            <HiOutlineGift className="w-3 h-3" />
-                            Нужна доставка
+                            <HiOutlineGift className="w-3 h-3 sm:w-3 sm:h-3" />
+                            <span className="text-xs sm:text-xs">Нужна доставка</span>
                           </span>
                         ) : (
                           <span className="badge-success">
-                            <HiOutlineTruck className="w-3 h-3" />
-                            Могу доставить
+                            <HiOutlineTruck className="w-3 h-3 sm:w-3 sm:h-3" />
+                            <span className="text-xs sm:text-xs">Могу доставить</span>
                           </span>
                         )}
                       </div>
                     </div>
                     
-                    <div className="flex items-center gap-3 mb-4">
-                      <div className="flex items-center gap-2">
+                    <div className="flex items-center gap-2 sm:gap-3 mb-4">
+                      <div className="flex items-center gap-1.5 sm:gap-2">
                         <div className="p-1.5 bg-primary-50 rounded-lg">
-                          <HiOutlineLocationMarker className="w-4 h-4 text-primary-600" />
+                          <HiOutlineLocationMarker className="w-4 h-4 sm:w-4 sm:h-4 text-primary-600" />
                         </div>
-                        <span className="font-semibold text-gray-900">{r.from_iata}</span>
+                        <span className="font-semibold text-gray-900 text-sm sm:text-base">{r.from_iata}</span>
                       </div>
-                      <HiArrowRight className="w-5 h-5 text-gray-400 flex-shrink-0" />
-                      <div className="flex items-center gap-2">
+                      <HiArrowRight className="w-4 h-4 sm:w-5 sm:h-5 text-gray-400 flex-shrink-0" />
+                      <div className="flex items-center gap-1.5 sm:gap-2">
                         <div className="p-1.5 bg-primary-50 rounded-lg">
-                          <HiOutlineLocationMarker className="w-4 h-4 text-primary-600" />
+                          <HiOutlineLocationMarker className="w-4 h-4 sm:w-4 sm:h-4 text-primary-600" />
                         </div>
-                        <span className="font-semibold text-gray-900">{r.to_iata}</span>
+                        <span className="font-semibold text-gray-900 text-sm sm:text-base">{r.to_iata}</span>
                       </div>
                     </div>
 
-                    <div className="flex flex-wrap items-center gap-4 text-sm text-gray-600 mb-4">
+                    <div className="flex flex-col sm:flex-row sm:flex-wrap items-start sm:items-center gap-2 sm:gap-4 text-xs sm:text-sm text-gray-600 mb-4">
                       <div className="flex items-center gap-1.5">
-                        <HiOutlineCalendar className="w-4 h-4" />
-                        <span>{formatDate(r.date_start)} – {formatDate(r.date_end)}</span>
+                        <HiOutlineCalendar className="w-4 h-4 sm:w-4 sm:h-4 flex-shrink-0" />
+                        <span className="break-words">{formatDate(r.date_start)} – {formatDate(r.date_end)}</span>
                       </div>
                       <div className="flex items-center gap-1.5">
-                        <HiOutlineCube className="w-4 h-4" />
+                        <HiOutlineCube className="w-4 h-4 sm:w-4 sm:h-4 flex-shrink-0" />
                         <span>{formatItem(r.item)}</span>
                         <span className="text-gray-400">•</span>
                         <span>{formatWeight(r.weight)}</span>
@@ -222,8 +224,8 @@ export default function BrowsePage() {
                     </div>
 
                     <div className="flex items-center justify-between pt-4 border-t border-gray-100">
-                      <span className="text-sm text-gray-500">Нажмите, чтобы просмотреть совпадения</span>
-                      <HiArrowRight className="w-5 h-5 text-primary-600" />
+                      <span className="text-xs sm:text-sm text-gray-500">Нажмите, чтобы просмотреть совпадения</span>
+                      <HiArrowRight className="w-4 h-4 sm:w-5 sm:h-5 text-primary-600 flex-shrink-0" />
                     </div>
                   </Link>
                 ))}
