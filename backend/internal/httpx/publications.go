@@ -18,8 +18,8 @@ type PubIn struct {
 	ToIATA       string `json:"to_iata" binding:"required,len=3"`
 	DateStart    string `json:"date_start" binding:"required"` // YYYY-MM-DD
 	DateEnd      string `json:"date_end" binding:"required"`
-	Item         string `json:"item"`       // documents|small
-	Weight       string `json:"weight"`     // envelope|le1kg|le3kg
+	Item         string `json:"item"`   // documents|small
+	Weight       string `json:"weight"` // envelope|le1kg|le3kg
 	RewardHint   *int   `json:"reward_hint"`
 	Description  string `json:"description"`
 	FlightNo     string `json:"flight_no"`

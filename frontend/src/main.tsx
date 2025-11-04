@@ -1,4 +1,4 @@
-import React from "react";
+import React, { useEffect } from "react";
 import { createRoot } from "react-dom/client";
 import { BrowserRouter, Routes, Route, Link, useLocation } from "react-router-dom";
 import { HiOutlinePaperAirplane, HiOutlinePlusCircle, HiOutlineSearch } from "react-icons/hi";
@@ -8,6 +8,25 @@ import BrowsePage from "./pages/BrowsePage";
 import MatchesPage from "./pages/MatchesPage";
 import AuthPage from "./pages/AuthPage";
 import PolicyFooter from "./components/PolicyFooter";
+import { initPostHog, posthog } from "./lib/posthog";
+
+// Initialize PostHog analytics
+initPostHog();
+
+// Track pageviews on route changes
+function PostHogPageView() {
+  const location = useLocation();
+
+  useEffect(() => {
+    if (posthog) {
+      posthog.capture('$pageview', {
+        $current_url: window.location.href,
+      });
+    }
+  }, [location]);
+
+  return null;
+}
 
 function Header() {
   const location = useLocation();
@@ -88,6 +107,7 @@ function BottomNav() {
 function App() {
   return (
     <BrowserRouter>
+      <PostHogPageView />
       <Routes>
         <Route path="/auth" element={<AuthPage />} />
         <Route

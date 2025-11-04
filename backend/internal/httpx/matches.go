@@ -27,6 +27,11 @@ func RegisterMatchRoutes(g *gin.RouterGroup, pool *pgxpool.Pool) {
 	g.POST("/deals", createDeal(pool))     // {request_pub_id, trip_pub_id}
 }
 
+// RegisterMatchAuthRoutes registers only auth-required match routes
+func RegisterMatchAuthRoutes(g *gin.RouterGroup, pool *pgxpool.Pool) {
+	g.POST("/deals", createDeal(pool))     // {request_pub_id, trip_pub_id}
+}
+
 func findMatches(pool *pgxpool.Pool) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		pubIDStr := c.Query("pub_id")

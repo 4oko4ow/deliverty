@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from "react";
-import { api } from "../lib/api";
+import { api, isAuthenticated } from "../lib/api";
 import { useParams, useNavigate } from "react-router-dom";
 import { HiOutlineLocationMarker, HiOutlineCalendar, HiOutlineCube, HiOutlineArrowLeft, HiOutlineSparkles, HiOutlinePaperAirplane, HiOutlineExclamationCircle } from "react-icons/hi";
 import { HiOutlineGift, HiOutlineTruck, HiOutlineCheckCircle } from "react-icons/hi2";
@@ -60,6 +60,12 @@ export default function MatchesPage() {
   }, [pubId]);
 
   async function makeDeal(otherPubId: number, otherKind: string) {
+    // Check authentication before creating deal
+    if (!isAuthenticated()) {
+      navigate("/auth");
+      return;
+    }
+
     setCreating(otherPubId);
     setError(null);
     try {

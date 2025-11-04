@@ -31,6 +31,13 @@ export function tgHeader(): { "X-TG-User-ID": string } | {} {
   return { "X-TG-User-ID": uid };
 }
 
+/**
+ * Check if user is authenticated
+ */
+export function isAuthenticated(): boolean {
+  return getTelegramUserIdForAuth() !== null;
+}
+
 async function handleResponse<T>(response: Response): Promise<T> {
   const data = await response.json();
   if (!response.ok) {
@@ -58,23 +65,18 @@ export const api = {
 
   listPubs: async (from: string, to: string, kind?: string) => {
     const response = await fetch(
-      `${BASE}/publications?from=${from}&to=${to}${kind ? `&kind=${kind}` : ""}`,
-      { headers: tgHeader() }
+      `${BASE}/publications?from=${from}&to=${to}${kind ? `&kind=${kind}` : ""}`
     );
     return handleResponse(response);
   },
 
   getPub: async (id: string) => {
-    const response = await fetch(`${BASE}/publications/${id}`, { 
-      headers: tgHeader() 
-    });
+    const response = await fetch(`${BASE}/publications/${id}`);
     return handleResponse(response);
   },
 
   matches: async (pubId: string) => {
-    const response = await fetch(`${BASE}/matches?pub_id=${pubId}`, { 
-      headers: tgHeader() 
-    });
+    const response = await fetch(`${BASE}/matches?pub_id=${pubId}`);
     return handleResponse(response);
   },
 

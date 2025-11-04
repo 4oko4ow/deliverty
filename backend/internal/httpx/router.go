@@ -25,10 +25,16 @@ func RegisterRoutes(r *gin.Engine, pool *pgxpool.Pool) {
 		// Telegram Login Widget callback (no auth required)
 		api.GET("/auth/telegram", handleTelegramAuth(pool))
 
+		// Public routes (no auth required)
+		api.GET("/publications", listPublications(pool))
+		api.GET("/publications/:id", getPublication(pool))
+		api.GET("/matches", findMatches(pool))
+
+		// Auth required routes
 		auth := api.Group("/")
 		auth.Use(WithUser(pool))
-		RegisterPublicationRoutes(auth, pool)
-		RegisterMatchRoutes(auth, pool)
+		auth.POST("/publications", RateLimit(20), createPublication(pool))
+		RegisterMatchAuthRoutes(auth, pool)
 		RegisterDealRoutes(auth, pool)
 	}
 

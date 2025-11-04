@@ -1,6 +1,6 @@
 import { useState } from "react";
 import AirportInput from "../components/AirportInput";
-import { api } from "../lib/api";
+import { api, isAuthenticated } from "../lib/api";
 import { useNavigate } from "react-router-dom";
 import { HiOutlineCalendar, HiOutlineCube, HiOutlineExclamationCircle, HiOutlinePaperAirplane } from "react-icons/hi";
 import { HiOutlineSparkles, HiOutlineGift, HiOutlineTruck } from "react-icons/hi2";
@@ -22,6 +22,12 @@ export default function PublishPage() {
     const nav = useNavigate();
 
     async function submit() {
+        // Check authentication before creating publication
+        if (!isAuthenticated()) {
+            nav("/auth");
+            return;
+        }
+
         if (!from || !to || !dateStart || !dateEnd) {
             setError("Заполните все обязательные поля");
             return;
