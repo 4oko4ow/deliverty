@@ -162,28 +162,24 @@ Alternatively, if using Blueprint:
 
 #### IPv6 Network Unreachable Error
 
-If you see errors like `dial tcp [2a05:d018:...]:5432: connect: network is unreachable`, Supabase is returning an IPv6 address but Render doesn't support IPv6.
+If you see errors like `dial tcp [2a05:d018:...]:5432: connect: network is unreachable` or `no suitable address found`, Supabase is returning IPv6 addresses but Render doesn't support IPv6.
 
-**Solutions:**
+**⚠️ IMPORTANT: You MUST use Supabase Session Pooler (port 6543)**
 
-1. **Use Supabase Connection Pooling (Recommended):**
-   - In Supabase Dashboard → Settings → Database
-   - Use the "Connection pooling" URL (port 6543) instead of direct connection
-   - Format: `postgresql://postgres:[PASSWORD]@[PROJECT].supabase.co:6543/postgres?sslmode=require`
-   - This usually uses IPv4
+The direct connection (port 5432) only supports IPv6 on some Supabase projects. Render requires IPv4.
 
-2. **Force IPv4 in connection string:**
-   - Add `?host=[PROJECT].supabase.co` to explicitly use the hostname
-   - Or use the Transaction Pooler mode URL from Supabase
+**Solution - Use Session Pooler:**
 
-3. **Code fix (already applied):**
-   - The code now forces IPv4 connections via `tcp4` dialer
-   - Redeploy after code update
+1. Go to Supabase Dashboard → Settings → Database
+2. Find "Connection string" section
+3. Select **"Session mode"** (NOT Transaction mode)
+4. Copy the connection string - it should have port **6543**
+5. Format: `postgresql://postgres.[PROJECT]:[PASSWORD]@aws-0-[REGION].pooler.supabase.com:6543/postgres?sslmode=require`
+   - Or: `postgresql://postgres:[PASSWORD]@[PROJECT].supabase.co:6543/postgres?sslmode=require`
+6. Update `DATABASE_URL` environment variable in Render with this new URL
+7. Redeploy your service
 
-4. **Check Supabase firewall:**
-   - Supabase Dashboard → Settings → Database → Network Restrictions
-   - Allow connections from all IPs (0.0.0.0/0) or specific Render IPs
-   - Connection pooling URLs don't require firewall changes
+**Note:** Session Pooler uses IPv4 and works with Render. The code fix will help if you get IPv6 addresses, but Session Pooler is the correct solution for Render.
 
 - Verify Supabase connection string is correct
 - Check Supabase firewall settings (allow connections from Render IPs)

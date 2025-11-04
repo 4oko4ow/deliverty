@@ -2,11 +2,10 @@ import { useState } from "react";
 import AirportInput from "../components/AirportInput";
 import { api } from "../lib/api";
 import { useNavigate } from "react-router-dom";
-import { HiOutlineGift, HiOutlineTruck, HiOutlineCalendar, HiOutlineCube, HiOutlinePaperAirplane, HiOutlineExclamationCircle } from "react-icons/hi";
+import { HiOutlineCalendar, HiOutlineCube, HiOutlineExclamationCircle } from "react-icons/hi";
 import { HiOutlineSparkles } from "react-icons/hi2";
 
 export default function PublishPage() {
-    const [kind, setKind] = useState<"request" | "trip">("request");
     const [from, setFrom] = useState("");
     const [to, setTo] = useState("");
     const [dateStart, setDS] = useState("");
@@ -14,8 +13,6 @@ export default function PublishPage() {
     const [item, setItem] = useState("documents");
     const [weight, setWeight] = useState("envelope");
     const [desc, setDesc] = useState("");
-    const [flight_no, setFN] = useState("");
-    const [airline, setAirline] = useState("");
     const [submitting, setSubmitting] = useState(false);
     const [error, setError] = useState<string | null>(null);
     const nav = useNavigate();
@@ -44,7 +41,7 @@ export default function PublishPage() {
         setSubmitting(true);
         try {
             const body: any = {
-                kind,
+                kind: "request",
                 from_iata: from,
                 to_iata: to,
                 date_start: dateStart,
@@ -53,10 +50,6 @@ export default function PublishPage() {
                 weight,
                 description: desc,
             };
-            if (kind === "trip") {
-                body.flight_no = flight_no;
-                body.airline = airline;
-            }
             const res = await api.createPub(body);
             if ('error' in res) {
                 setError(res.error || "Ошибка при создании объявления");
@@ -78,59 +71,10 @@ export default function PublishPage() {
         <div className="max-w-2xl mx-auto space-y-6 animate-fade-in">
             <div className="text-center space-y-2">
                 <h1 className="text-3xl font-bold text-gray-900">Создать объявление</h1>
-                <p className="text-gray-600">Нужно передать что-то? Или летите по своим делам и можете взять посылку с собой?</p>
+                <p className="text-gray-600">Нужно передать что-то? Создайте запрос и мы найдем людей, которые летят по вашему маршруту</p>
             </div>
 
             <div className="card p-6 space-y-6">
-                {/* Type Selection */}
-                <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-3">
-                        Я хочу...
-                    </label>
-                    <div className="grid grid-cols-2 gap-3">
-                        <button
-                            onClick={() => setKind("request")}
-                            className={`p-4 rounded-xl border-2 transition-all ${kind === "request"
-                                ? "border-primary-500 bg-primary-50 shadow-md"
-                                : "border-gray-200 hover:border-gray-300 bg-white"
-                                }`}
-                        >
-                            <div className="flex flex-col items-center gap-2">
-                                <div className={`p-3 rounded-lg ${kind === "request" ? "bg-primary-100" : "bg-gray-100"
-                                    }`}>
-                                    <HiOutlineGift className={`w-6 h-6 ${kind === "request" ? "text-primary-600" : "text-gray-600"
-                                        }`} />
-                                </div>
-                                <span className={`font-medium ${kind === "request" ? "text-primary-700" : "text-gray-700"
-                                    }`}>
-                                    Нужно передать
-                                </span>
-                                <span className="text-xs text-gray-500">Мне нужно передать посылку/документы</span>
-                            </div>
-                        </button>
-                        <button
-                            onClick={() => setKind("trip")}
-                            className={`p-4 rounded-xl border-2 transition-all ${kind === "trip"
-                                ? "border-primary-500 bg-primary-50 shadow-md"
-                                : "border-gray-200 hover:border-gray-300 bg-white"
-                                }`}
-                        >
-                            <div className="flex flex-col items-center gap-2">
-                                <div className={`p-3 rounded-lg ${kind === "trip" ? "bg-primary-100" : "bg-gray-100"
-                                    }`}>
-                                    <HiOutlineTruck className={`w-6 h-6 ${kind === "trip" ? "text-primary-600" : "text-gray-600"
-                                        }`} />
-                                </div>
-                                <span className={`font-medium ${kind === "trip" ? "text-primary-700" : "text-gray-700"
-                                    }`}>
-                                    Лечу и могу взять
-                                </span>
-                                <span className="text-xs text-gray-500">Лечу по своим делам, могу взять что-то с собой</span>
-                            </div>
-                        </button>
-                    </div>
-                </div>
-
                 {/* Route */}
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                     <AirportInput label="Откуда" value={from} onChange={setFrom} />
@@ -141,7 +85,7 @@ export default function PublishPage() {
                 <div>
                     <label className="block text-sm font-medium text-gray-700 mb-2">
                         <HiOutlineCalendar className="w-4 h-4 inline mr-1" />
-                        Даты поездки
+                        Период доставки
                     </label>
                     <div className="grid grid-cols-2 gap-3">
                         <div>
@@ -200,30 +144,6 @@ export default function PublishPage() {
                     </div>
                 </div>
 
-                {/* Flight Info (for trips) */}
-                {kind === "trip" && (
-                    <div className="p-4 bg-blue-50 rounded-lg border border-blue-200">
-                        <label className="block text-sm font-medium text-gray-700 mb-3">
-                            <HiOutlinePaperAirplane className="w-4 h-4 inline mr-1" />
-                            Данные рейса (опционально)
-                        </label>
-                        <div className="grid grid-cols-2 gap-3">
-                            <input
-                                className="input"
-                                placeholder="Номер рейса"
-                                value={flight_no}
-                                onChange={(e) => setFN(e.target.value)}
-                            />
-                            <input
-                                className="input"
-                                placeholder="Авиакомпания"
-                                value={airline}
-                                onChange={(e) => setAirline(e.target.value)}
-                            />
-                        </div>
-                    </div>
-                )}
-
                 {/* Description */}
                 <div>
                     <label className="block text-sm font-medium text-gray-700 mb-2">
@@ -231,7 +151,7 @@ export default function PublishPage() {
                     </label>
                     <textarea
                         className="input h-32 resize-none"
-                        placeholder="Добавьте дополнительные детали. Например, для запроса: что именно нужно передать. Для поездки: дополнительные детали о вашем рейсе или маршруте. Учтите: контакты (телефон, @username, ссылки) запрещены в описании."
+                        placeholder="Добавьте дополнительные детали о том, что нужно передать. Учтите: контакты (телефон, @username, ссылки) запрещены в описании."
                         value={desc}
                         onChange={(e) => {
                             setDesc(e.target.value);
