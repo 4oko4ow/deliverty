@@ -67,18 +67,23 @@ func createPublication(pool *pgxpool.Pool) gin.HandlerFunc {
 			return
 		}
 
-		uid := c.GetString(CtxUserID)
+		// Get user ID from context (set by WithUser middleware)
+		userID, exists := c.Get(CtxDBUserID)
+		if !exists {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "user not authenticated"})
+			return
+		}
+		uid := userID.(int64)
 
 		// reject same user posting identical from/to/dates/desc in last 1h
 		var dup int
 		_ = pool.QueryRow(c, `
-		  SELECT count(*) FROM publication p
-		  JOIN app_user u ON u.id=p.user_id
-		  WHERE u.tg_user_id=$1 AND p.is_active
-		    AND p.from_iata=$2 AND p.to_iata=$3
-		    AND p.date_start=$4 AND p.date_end=$5
-		    AND coalesce(p.description,'')=$6
-		    AND p.created_at > now() - interval '1 hour'
+		  SELECT count(*) FROM publication
+		  WHERE user_id=$1 AND is_active
+		    AND from_iata=$2 AND to_iata=$3
+		    AND date_start=$4 AND date_end=$5
+		    AND coalesce(description,'')=$6
+		    AND created_at > now() - interval '1 hour'
 		`, uid, in.FromIATA, in.ToIATA, ds, de, in.Description).Scan(&dup)
 		if dup > 0 {
 			c.JSON(http.StatusTooManyRequests, gin.H{"error": "дубликат слишком скоро"})
@@ -87,18 +92,8 @@ func createPublication(pool *pgxpool.Pool) gin.HandlerFunc {
 
 		// enforce ≤5 active pubs per user
 		var cnt int
-		if err := pool.QueryRow(c, `SELECT count(*) FROM publication p JOIN app_user u ON u.id=p.user_id WHERE u.tg_user_id=$1 AND p.is_active`, uid).Scan(&cnt); err == nil && cnt >= 5 {
+		if err := pool.QueryRow(c, `SELECT count(*) FROM publication WHERE user_id=$1 AND is_active`, uid).Scan(&cnt); err == nil && cnt >= 5 {
 			c.JSON(http.StatusForbidden, gin.H{"error": "лимит 5 активных публикаций"})
-			return
-		}
-
-		// upsert app_user by tg_user_id (MVP)
-		var userID int64
-		if err := pool.QueryRow(c, `
-		  INSERT INTO app_user (tg_user_id) VALUES ($1)
-		  ON CONFLICT (tg_user_id) DO UPDATE SET tg_user_id=EXCLUDED.tg_user_id
-		  RETURNING id`, uid).Scan(&userID); err != nil {
-			c.JSON(http.StatusInternalServerError, gin.H{"error": "ошибка обновления пользователя"})
 			return
 		}
 

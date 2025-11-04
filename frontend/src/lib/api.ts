@@ -1,9 +1,33 @@
 const BASE = import.meta.env.VITE_API_BASE || "http://localhost:8080/api";
 const TG = import.meta.env.VITE_TG_BOT || "your_bot";
 
-export function tgHeader() {
-  // MVP: hardcode or read from localStorage after bot auth
-  const uid = localStorage.getItem("tg_uid") || "123456789";
+/**
+ * Get Telegram user ID for authentication
+ * Uses localStorage (set after Telegram Login Widget callback)
+ */
+function getTelegramUserIdForAuth(): string | null {
+  // Get from localStorage (set after Telegram auth)
+  const saved = localStorage.getItem("tg_uid");
+  if (saved) {
+    return saved;
+  }
+
+  // Development fallback (only in dev, not in production)
+  if (import.meta.env.DEV) {
+    console.warn("⚠️ Using development fallback user ID. Please authenticate via /auth");
+    return "123456789"; // Dev fallback
+  }
+
+  return null;
+}
+
+export function tgHeader(): { "X-TG-User-ID": string } | {} {
+  const uid = getTelegramUserIdForAuth();
+  if (!uid) {
+    console.error("❌ No Telegram user ID available. Redirect to /auth");
+    // Could redirect to /auth here, but better let the component handle it
+    return {};
+  }
   return { "X-TG-User-ID": uid };
 }
 

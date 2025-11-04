@@ -110,8 +110,8 @@ export default function BrowsePage() {
               type="button"
               onClick={() => setKindFilter("all")}
               className={`px-3 py-2.5 sm:px-4 sm:py-2 rounded-lg border-2 transition-all text-xs sm:text-sm touch-manipulation min-h-[48px] ${kindFilter === "all"
-                  ? "border-primary-500 bg-primary-50 text-primary-900 font-semibold"
-                  : "border-gray-200 hover:border-gray-300 active:bg-gray-50 text-gray-600"
+                ? "border-primary-500 bg-primary-50 text-primary-900 font-semibold"
+                : "border-gray-200 hover:border-gray-300 active:bg-gray-50 text-gray-600"
                 }`}
             >
               Все
@@ -120,8 +120,8 @@ export default function BrowsePage() {
               type="button"
               onClick={() => setKindFilter("request")}
               className={`px-2 py-2.5 sm:px-4 sm:py-2 rounded-lg border-2 transition-all text-xs sm:text-sm flex items-center justify-center gap-1 sm:gap-1.5 touch-manipulation min-h-[48px] ${kindFilter === "request"
-                  ? "border-primary-500 bg-primary-50 text-primary-900 font-semibold"
-                  : "border-gray-200 hover:border-gray-300 active:bg-gray-50 text-gray-600"
+                ? "border-primary-500 bg-primary-50 text-primary-900 font-semibold"
+                : "border-gray-200 hover:border-gray-300 active:bg-gray-50 text-gray-600"
                 }`}
             >
               <HiOutlineGift className="w-4 h-4 sm:w-4 sm:h-4 flex-shrink-0" />
@@ -132,8 +132,8 @@ export default function BrowsePage() {
               type="button"
               onClick={() => setKindFilter("trip")}
               className={`px-2 py-2.5 sm:px-4 sm:py-2 rounded-lg border-2 transition-all text-xs sm:text-sm flex items-center justify-center gap-1 sm:gap-1.5 touch-manipulation min-h-[48px] ${kindFilter === "trip"
-                  ? "border-primary-500 bg-primary-50 text-primary-900 font-semibold"
-                  : "border-gray-200 hover:border-gray-300 active:bg-gray-50 text-gray-600"
+                ? "border-primary-500 bg-primary-50 text-primary-900 font-semibold"
+                : "border-gray-200 hover:border-gray-300 active:bg-gray-50 text-gray-600"
                 }`}
             >
               <HiOutlineTruck className="w-4 h-4 sm:w-4 sm:h-4 flex-shrink-0" />

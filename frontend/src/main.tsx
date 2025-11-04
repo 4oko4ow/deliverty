@@ -6,6 +6,7 @@ import "./index.css";
 import PublishPage from "./pages/PublishPage";
 import BrowsePage from "./pages/BrowsePage";
 import MatchesPage from "./pages/MatchesPage";
+import AuthPage from "./pages/AuthPage";
 import PolicyFooter from "./components/PolicyFooter";
 
 function Header() {
@@ -87,18 +88,26 @@ function BottomNav() {
 function App() {
   return (
     <BrowserRouter>
-      <div className="min-h-screen pb-20 sm:pb-0">
-        <Header />
-        <main className="max-w-4xl mx-auto px-4 py-6 sm:py-8">
-          <Routes>
-            <Route path="/" element={<BrowsePage />} />
-            <Route path="/publish" element={<PublishPage />} />
-            <Route path="/matches/:pubId" element={<MatchesPage />} />
-          </Routes>
-        </main>
-        <PolicyFooter />
-        <BottomNav />
-      </div>
+      <Routes>
+        <Route path="/auth" element={<AuthPage />} />
+        <Route
+          path="/*"
+          element={
+            <div className="min-h-screen pb-20 sm:pb-0">
+              <Header />
+              <main className="max-w-4xl mx-auto px-4 py-6 sm:py-8">
+                <Routes>
+                  <Route path="/" element={<BrowsePage />} />
+                  <Route path="/publish" element={<PublishPage />} />
+                  <Route path="/matches/:pubId" element={<MatchesPage />} />
+                </Routes>
+              </main>
+              <PolicyFooter />
+              <BottomNav />
+            </div>
+          }
+        />
+      </Routes>
     </BrowserRouter>
   );
 }

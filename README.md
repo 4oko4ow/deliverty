@@ -125,6 +125,52 @@ npm run dev
 
 Frontend will be available at: http://localhost:5173
 
+### 5. Telegram Bot Setup for Login Widget
+
+The app uses Telegram Login Widget for authentication (no need to host as Mini App):
+
+1. **Create Bot** (if not done already):
+   - Talk to [@BotFather](https://t.me/BotFather)
+   - Send `/newbot` and follow instructions
+   - Get your bot token and username
+
+2. **Set Domain for Login Widget**:
+   
+   **For Production:**
+   - Send `/setdomain` to @BotFather
+   - Select your bot
+   - Provide your **frontend URL** (where Login Widget is hosted)
+     - **If using Vercel**: `your-project.vercel.app` (or your custom domain)
+     - **If using other hosting**: your frontend domain (e.g., `your-domain.com`)
+   - ⚠️ **Important**: Use your **frontend URL** (Vercel), NOT backend URL (Render)
+   - This is **required** for the Login Widget to work in production
+   
+   **For Local Development:**
+   - Option A: Use a tunnel service (ngrok, localtunnel, etc.)
+     ```bash
+     # Install ngrok, then:
+     ngrok http 5173  # or your frontend port
+     # Use the ngrok URL (e.g., https://abc123.ngrok.io) in /setdomain
+     ```
+   - Option B: Skip auth setup and use fallback user ID
+     - The app will use `123456789` as fallback in dev mode
+     - No Telegram auth needed for local testing
+
+3. **Configure Frontend**:
+   - Set `VITE_TG_BOT` in `frontend/.env` to your bot username (without @)
+   - Example: `VITE_TG_BOT=deliverty_bot`
+
+4. **User Registration**:
+   - Users visit `/auth` page and click "Login with Telegram"
+   - They authorize via Telegram Login Widget
+   - User ID is saved to localStorage and user is created in database
+   - No manual registration needed!
+
+**Important**: 
+- Domain is **required for production** use
+- For local dev, you can use tunnels (ngrok) or skip auth entirely (fallback mode)
+- The Login Widget will only work on the domain you set via `/setdomain`
+
 ## Health Checks
 
 Test the API endpoints:
@@ -158,6 +204,7 @@ Or run individual test commands manually - see `ops/qa_commands.md` for detailed
 **API Endpoints:**
 - `GET /healthz` - Health check
 - `GET /api/airports?q=search` - Airport search
+- `GET /api/auth/telegram` - Telegram Login Widget callback
 - `POST /api/publications` - Create publication (requires `X-TG-User-ID` header)
 - `GET /api/publications?from=BKK&to=SVO` - List publications
 - `GET /api/matches?pub_id=123` - Find matches
@@ -174,6 +221,7 @@ Or run individual test commands manually - see `ops/qa_commands.md` for detailed
 - **Content Policy**: Banned items filtering and description validation
 - **Rate Limiting**: IP-based rate limiting to prevent abuse
 - **Anti-Spam**: Duplicate publication detection
+- **Telegram Authentication**: Login via Telegram Login Widget (OAuth-like, no Mini App required)
 
 ## Production Deployment
 
