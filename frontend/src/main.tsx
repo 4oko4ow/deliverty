@@ -48,8 +48,8 @@ function Header() {
             <Link
               to="/"
               className={`px-4 py-2 rounded-lg text-sm font-medium transition-all ${location.pathname === "/"
-                  ? "bg-primary-50 text-primary-700"
-                  : "text-gray-600 hover:text-gray-900 hover:bg-gray-50"
+                ? "bg-primary-50 text-primary-700"
+                : "text-gray-600 hover:text-gray-900 hover:bg-gray-50"
                 }`}
             >
               Поиск
@@ -57,8 +57,8 @@ function Header() {
             <Link
               to="/publish"
               className={`px-4 py-2 rounded-lg text-sm font-medium transition-all ${location.pathname === "/publish"
-                  ? "bg-primary-50 text-primary-700"
-                  : "text-gray-600 hover:text-gray-900 hover:bg-gray-50"
+                ? "bg-primary-50 text-primary-700"
+                : "text-gray-600 hover:text-gray-900 hover:bg-gray-50"
                 }`}
             >
               Создать
@@ -79,8 +79,8 @@ function BottomNav() {
         <Link
           to="/"
           className={`flex flex-col items-center justify-center gap-1 px-4 py-2 rounded-lg transition-all ${location.pathname === "/"
-              ? "text-primary-600"
-              : "text-gray-500"
+            ? "text-primary-600"
+            : "text-gray-500"
             }`}
         >
           <HiOutlineSearch className="w-6 h-6" />
@@ -89,8 +89,8 @@ function BottomNav() {
         <Link
           to="/publish"
           className={`flex flex-col items-center justify-center gap-1 px-4 py-2 rounded-lg transition-all ${location.pathname === "/publish"
-              ? "text-primary-600"
-              : "text-gray-500"
+            ? "text-primary-600"
+            : "text-gray-500"
             }`}
         >
           <HiOutlinePlusCircle className="w-6 h-6" />

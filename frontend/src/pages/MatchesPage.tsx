@@ -189,6 +189,43 @@ export default function MatchesPage() {
                 <p className="text-sm text-gray-700 whitespace-pre-wrap">{pub.description}</p>
               </div>
             )}
+            
+            {/* Action button for original publication */}
+            <div className="mt-4 pt-4 border-t border-gray-100">
+              <div className={`border rounded-lg p-4 ${rows.length === 0 ? 'bg-blue-50 border-blue-200' : 'bg-gray-50 border-gray-200'}`}>
+                <div className="flex items-start gap-3 mb-3">
+                  <HiOutlinePaperAirplane className={`w-5 h-5 flex-shrink-0 mt-0.5 ${rows.length === 0 ? 'text-blue-600' : 'text-gray-600'}`} />
+                  <div>
+                    <p className={`text-sm font-semibold mb-1 ${rows.length === 0 ? 'text-blue-900' : 'text-gray-900'}`}>
+                      {rows.length === 0 
+                        ? "Хотите связаться с автором этого объявления?"
+                        : "Альтернативный вариант"}
+                    </p>
+                    <p className={`text-xs ${rows.length === 0 ? 'text-blue-700' : 'text-gray-600'}`}>
+                      {rows.length === 0 
+                        ? (pub.kind === "request" 
+                            ? "Создайте объявление о поездке по этому маршруту, чтобы автор увидел вас в совпадениях и мог связаться." 
+                            : "Создайте запрос на доставку по этому маршруту, чтобы автор увидел вас в совпадениях и мог связаться.")
+                        : (pub.kind === "request" 
+                            ? "Вместо выбора существующего совпадения, вы можете создать свое объявление о поездке, чтобы автор увидел вас." 
+                            : "Вместо выбора существующего совпадения, вы можете создать свой запрос, чтобы автор увидел вас.")}
+                    </p>
+                  </div>
+                </div>
+                <button
+                  onClick={() => {
+                    // Navigate to publish page with pre-filled data
+                    // Same route, opposite kind (request ↔ trip)
+                    const oppositeKind = pub.kind === "request" ? "trip" : "request";
+                    navigate(`/publish?kind=${oppositeKind}&from=${pub.from_iata}&to=${pub.to_iata}&date_start=${pub.date_start}&date_end=${pub.date_end}`);
+                  }}
+                  className={`btn w-full sm:w-auto ${rows.length === 0 ? 'btn-primary' : 'btn-secondary'}`}
+                >
+                  <HiOutlinePaperAirplane className="w-4 h-4" />
+                  Создать встречное объявление
+                </button>
+              </div>
+            </div>
           </div>
 
           {/* Show matches or no matches message */}
@@ -223,6 +260,20 @@ export default function MatchesPage() {
             </div>
           ) : (
             <>
+              <div className="bg-green-50 border border-green-200 rounded-lg p-4 mb-4">
+                <div className="flex items-start gap-2">
+                  <HiOutlineSparkles className="w-5 h-5 text-green-600 flex-shrink-0 mt-0.5" />
+                  <div>
+                    <p className="text-sm font-semibold text-green-900 mb-1">
+                      Найдены совпадения!
+                    </p>
+                    <p className="text-xs text-green-700">
+                      Выберите подходящий вариант ниже и нажмите "Открыть чат в Telegram", чтобы связаться с автором.
+                    </p>
+                  </div>
+                </div>
+              </div>
+
               <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2">
                 <p className="text-sm sm:text-sm text-gray-600">
                   Найдено <span className="font-semibold text-gray-900">{rows.length}</span> {rows.length === 1 ? "совпадение" : rows.length < 5 ? "совпадения" : "совпадений"}

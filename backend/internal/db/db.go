@@ -6,6 +6,7 @@ import (
 	"net"
 	"time"
 
+	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 )
 
@@ -63,6 +64,10 @@ func Connect(dsn string) (*pgxpool.Pool, error) {
 
 	cfg.MaxConns = 8
 	cfg.MaxConnIdleTime = 5 * time.Minute
+
+	// Use simple query protocol to avoid prepared statement name collisions
+	// This prevents "prepared statement already exists" errors when connections are reused
+	cfg.ConnConfig.DefaultQueryExecMode = pgx.QueryExecModeSimpleProtocol
 
 	pool, err := pgxpool.NewWithConfig(context.Background(), cfg)
 	if err != nil {

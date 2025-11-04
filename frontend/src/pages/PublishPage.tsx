@@ -1,11 +1,12 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import AirportInput from "../components/AirportInput";
 import { api, isAuthenticated } from "../lib/api";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useSearchParams } from "react-router-dom";
 import { HiOutlineCalendar, HiOutlineCube, HiOutlineExclamationCircle, HiOutlinePaperAirplane } from "react-icons/hi";
 import { HiOutlineSparkles, HiOutlineGift, HiOutlineTruck } from "react-icons/hi2";
 
 export default function PublishPage() {
+    const [searchParams] = useSearchParams();
     const [kind, setKind] = useState<"request" | "trip">("request");
     const [from, setFrom] = useState("");
     const [to, setTo] = useState("");
@@ -20,6 +21,23 @@ export default function PublishPage() {
     const [submitting, setSubmitting] = useState(false);
     const [error, setError] = useState<string | null>(null);
     const nav = useNavigate();
+
+    // Pre-fill form from URL parameters
+    useEffect(() => {
+        const urlKind = searchParams.get("kind");
+        const urlFrom = searchParams.get("from");
+        const urlTo = searchParams.get("to");
+        const urlDateStart = searchParams.get("date_start");
+        const urlDateEnd = searchParams.get("date_end");
+
+        if (urlKind === "request" || urlKind === "trip") {
+            setKind(urlKind);
+        }
+        if (urlFrom) setFrom(urlFrom);
+        if (urlTo) setTo(urlTo);
+        if (urlDateStart) setDS(urlDateStart);
+        if (urlDateEnd) setDE(urlDateEnd);
+    }, [searchParams]);
 
     async function submit() {
         // Check authentication before creating publication
