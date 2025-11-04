@@ -9,6 +9,7 @@ import (
 	"sort"
 	"strings"
 
+	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 )
 
@@ -27,6 +28,12 @@ func Run(ctx context.Context, pool *pgxpool.Pool) error {
 		return fmt.Errorf("failed to acquire connection: %w", err)
 	}
 	defer conn.Release()
+
+	// Clear any existing prepared statements to avoid conflicts (especially important with Session Pooler)
+	// This is safe to run even if there are no prepared statements
+	underlyingConn := conn.Conn()
+	underlyingConn.Config().DefaultQueryExecMode = pgx.QueryExecModeSimpleProtocol
+	_, _ = underlyingConn.Exec(ctx, "DEALLOCATE ALL")
 
 	// Create migrations table if it doesn't exist
 	if err := createMigrationsTable(ctx, conn); err != nil {
@@ -70,7 +77,8 @@ func createMigrationsTable(ctx context.Context, conn *pgxpool.Conn) error {
 			applied_at TIMESTAMPTZ NOT NULL DEFAULT now()
 		)
 	`
-	_, err := conn.Exec(ctx, query)
+	// Use underlying connection with simple query protocol (already configured in Run)
+	_, err := conn.Conn().Exec(ctx, query)
 	return err
 }
 
@@ -169,7 +177,8 @@ func findMigrationsDir() string {
 // getAppliedMigrations returns a map of already applied migration names
 func getAppliedMigrations(ctx context.Context, conn *pgxpool.Conn) (map[string]bool, error) {
 	query := `SELECT name FROM schema_migrations`
-	rows, err := conn.Query(ctx, query)
+	// Use underlying connection with simple query protocol (already configured in Run)
+	rows, err := conn.Conn().Query(ctx, query)
 	if err != nil {
 		return nil, err
 	}
@@ -189,19 +198,22 @@ func getAppliedMigrations(ctx context.Context, conn *pgxpool.Conn) (map[string]b
 
 // applyMigration applies a single migration and records it
 func applyMigration(ctx context.Context, conn *pgxpool.Conn, migration Migration) error {
-	// Begin transaction
-	tx, err := conn.Begin(ctx)
+	// Use underlying connection (already configured to use simple protocol in Run)
+	underlyingConn := conn.Conn()
+
+	// Begin transaction on underlying connection
+	tx, err := underlyingConn.Begin(ctx)
 	if err != nil {
 		return err
 	}
 	defer tx.Rollback(ctx)
 
-	// Execute migration SQL
+	// Execute migration SQL using simple query protocol
 	if _, err := tx.Exec(ctx, migration.Content); err != nil {
 		return fmt.Errorf("failed to execute migration SQL: %w", err)
 	}
 
-	// Record migration
+	// Record migration using simple protocol
 	recordQuery := `INSERT INTO schema_migrations (name) VALUES ($1)`
 	if _, err := tx.Exec(ctx, recordQuery, migration.Name); err != nil {
 		return fmt.Errorf("failed to record migration: %w", err)
