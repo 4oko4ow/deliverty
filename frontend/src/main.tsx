@@ -2,20 +2,21 @@ import React, { useEffect } from "react";
 import { createRoot } from "react-dom/client";
 import { BrowserRouter, Routes, Route, Link, useLocation } from "react-router-dom";
 import { HiOutlinePaperAirplane, HiOutlinePlusCircle, HiOutlineSearch } from "react-icons/hi";
+import { PostHogProvider, usePostHog } from "posthog-js/react";
 import "./index.css";
 import PublishPage from "./pages/PublishPage";
 import BrowsePage from "./pages/BrowsePage";
 import MatchesPage from "./pages/MatchesPage";
 import AuthPage from "./pages/AuthPage";
 import PolicyFooter from "./components/PolicyFooter";
-import { initPostHog, posthog } from "./lib/posthog";
 
-// Initialize PostHog analytics
-initPostHog();
+const POSTHOG_KEY = import.meta.env.VITE_POSTHOG_KEY;
+const POSTHOG_HOST = import.meta.env.VITE_POSTHOG_HOST || 'https://app.posthog.com';
 
 // Track pageviews on route changes
 function PostHogPageView() {
   const location = useLocation();
+  const posthog = usePostHog();
 
   useEffect(() => {
     if (posthog) {
@@ -23,7 +24,7 @@ function PostHogPageView() {
         $current_url: window.location.href,
       });
     }
-  }, [location]);
+  }, [location, posthog]);
 
   return null;
 }
@@ -107,7 +108,7 @@ function BottomNav() {
 function App() {
   return (
     <BrowserRouter>
-      <PostHogPageView />
+      {POSTHOG_KEY && <PostHogPageView />}
       <Routes>
         <Route path="/auth" element={<AuthPage />} />
         <Route
@@ -132,4 +133,26 @@ function App() {
   );
 }
 
-createRoot(document.getElementById("root")!).render(<App />);
+const options = {
+  api_host: POSTHOG_HOST,
+  // Disable automatic pageview capture since we track manually with React Router
+  capture_pageview: false,
+  // Capture pageleaves automatically
+  capture_pageleave: true,
+} as const;
+
+const root = createRoot(document.getElementById("root")!);
+
+// Wrap app with PostHogProvider if API key is provided
+if (POSTHOG_KEY) {
+  root.render(
+    <PostHogProvider apiKey={POSTHOG_KEY} options={options}>
+      <App />
+    </PostHogProvider>
+  );
+} else {
+  if (import.meta.env.DEV) {
+    console.warn('⚠️ PostHog key not found. Analytics will be disabled.');
+  }
+  root.render(<App />);
+}
