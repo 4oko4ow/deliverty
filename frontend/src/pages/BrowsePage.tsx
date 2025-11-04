@@ -51,7 +51,7 @@ export default function BrowsePage() {
     <div className="space-y-6 animate-fade-in">
       <div className="text-center space-y-2">
         <h1 className="text-3xl font-bold text-gray-900">Найдите подходящий вариант</h1>
-        <p className="text-gray-600">Поиск запросов на доставку или попутчиков</p>
+        <p className="text-gray-600">Поиск людей, которые летят по пути и могут взять что-то с собой</p>
       </div>
 
       <div className="card p-6 space-y-4">
@@ -123,7 +123,7 @@ export default function BrowsePage() {
             <div className="card p-12 text-center">
               <HiOutlineSearch className="w-16 h-16 text-gray-300 mx-auto mb-4" />
               <h3 className="text-lg font-semibold text-gray-900 mb-2">Результаты не найдены</h3>
-              <p className="text-gray-600 mb-4">Попробуйте изменить критерии поиска или даты</p>
+              <p className="text-gray-600 mb-4">Пока нет людей, которые летят по этому маршруту. Попробуйте изменить критерии поиска или даты, или создайте свое объявление</p>
               <button
                 onClick={() => {
                   setFrom("");

@@ -78,7 +78,7 @@ export default function PublishPage() {
     <div className="max-w-2xl mx-auto space-y-6 animate-fade-in">
       <div className="text-center space-y-2">
         <h1 className="text-3xl font-bold text-gray-900">Создать объявление</h1>
-        <p className="text-gray-600">Опубликуйте запрос на доставку или предложите свою поездку</p>
+        <p className="text-gray-600">Нужно передать что-то? Или летите по своим делам и можете взять посылку с собой?</p>
       </div>
 
       <div className="card p-6 space-y-6">
@@ -107,9 +107,9 @@ export default function PublishPage() {
                 <span className={`font-medium ${
                   kind === "request" ? "text-primary-700" : "text-gray-700"
                 }`}>
-                  Запросить доставку
+                  Нужно передать
                 </span>
-                <span className="text-xs text-gray-500">Мне нужна доставка</span>
+                <span className="text-xs text-gray-500">Мне нужно передать посылку/документы</span>
               </div>
             </button>
             <button
@@ -131,9 +131,9 @@ export default function PublishPage() {
                 <span className={`font-medium ${
                   kind === "trip" ? "text-primary-700" : "text-gray-700"
                 }`}>
-                  Предложить поездку
+                  Лечу и могу взять
                 </span>
-                <span className="text-xs text-gray-500">Предлагаю доставку в ходе поездки</span>
+                <span className="text-xs text-gray-500">Лечу по своим делам, могу взять что-то с собой</span>
               </div>
             </button>
           </div>
@@ -239,7 +239,7 @@ export default function PublishPage() {
           </label>
           <textarea
             className="input h-32 resize-none"
-            placeholder="Добавьте дополнительные детали о вашем запросе или поездке. Учтите: контакты (телефон, @username, ссылки) запрещены в описании."
+            placeholder="Добавьте дополнительные детали. Например, для запроса: что именно нужно передать. Для поездки: дополнительные детали о вашем рейсе или маршруте. Учтите: контакты (телефон, @username, ссылки) запрещены в описании."
             value={desc}
             onChange={(e) => {
               setDesc(e.target.value);

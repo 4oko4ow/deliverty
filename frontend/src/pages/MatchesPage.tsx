@@ -95,7 +95,7 @@ export default function MatchesPage() {
 
       <div className="text-center space-y-2">
         <h1 className="text-3xl font-bold text-gray-900">Найденные совпадения</h1>
-        <p className="text-gray-600">Найдите подходящего партнера для доставки</p>
+        <p className="text-gray-600">Найдите человека, который летит по пути и может взять вашу посылку с собой</p>
       </div>
 
       {loading ? (
@@ -108,7 +108,7 @@ export default function MatchesPage() {
           <HiOutlineSparkles className="w-16 h-16 text-gray-300 mx-auto mb-4" />
           <h3 className="text-lg font-semibold text-gray-900 mb-2">Совпадения не найдены</h3>
           <p className="text-gray-600 mb-4">
-            Попробуйте расширить диапазон дат или изменить параметры поиска
+            Пока нет людей, которые летят по этому маршруту в указанные даты. Попробуйте расширить диапазон дат или изменить параметры поиска
           </p>
           <button
             onClick={() => navigate("/publish")}

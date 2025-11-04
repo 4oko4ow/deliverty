@@ -1,6 +1,6 @@
 # Deliverty
 
-A monorepo for the Deliverty platform - a peer-to-peer courier matching service connecting travelers with senders.
+A monorepo for the Deliverty platform - a peer-to-peer delivery service connecting people who need to send packages/documents with travelers who are already flying on the same route.
 
 ## Structure
 
@@ -152,9 +152,9 @@ Or run individual test commands manually - see `ops/qa_commands.md` for detailed
 
 ## Features
 
-- **Publications**: Create requests or trips with route, dates, and details
+- **Publications**: Create requests (need to send something) or trips (flying and can take something along)
 - **Matching**: Automatic matching based on route, dates, and weight compatibility
-- **Deals**: Connect senders and couriers via secure Telegram relay
+- **Deals**: Connect senders and travelers via secure Telegram relay
 - **Ratings**: Simple rating system for completed deals
 - **Reminders**: Automatic pre-flight reminders (24h and 3h before)
 - **Content Policy**: Banned items filtering and description validation
