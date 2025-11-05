@@ -5,6 +5,7 @@ import { api, isAuthenticated } from "../lib/api";
 import { useNavigate } from "react-router-dom";
 import { HiOutlineSearch, HiOutlineLocationMarker, HiOutlineCalendar, HiOutlineCube, HiArrowRight, HiOutlineExclamationCircle, HiOutlineCheckCircle } from "react-icons/hi";
 import { HiOutlineTruck, HiOutlineGift } from "react-icons/hi2";
+import { FaTelegram } from "react-icons/fa";
 import { formatItem, formatWeight } from "../lib/translations";
 import { usePostHogAnalytics } from "../lib/posthog";
 
@@ -19,6 +20,7 @@ export default function BrowsePage() {
   const [searched, setSearched] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [creating, setCreating] = useState<number | null>(null);
+  const [telegramLink, setTelegramLink] = useState<string | null>(null);
 
   // Restore search state after login
   useEffect(() => {
@@ -521,13 +523,17 @@ export default function BrowsePage() {
                 ? "text-green-700"
                 : "text-red-700"
                 }`}>{error}</p>
-              {error.includes("t.me/") && (
+              {telegramLink && (
                 <a
-                  href={`https://${error.match(/t\.me\/\w+/)?.[0]}`}
+                  href={telegramLink}
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="mt-2 inline-block text-sm text-green-700 underline hover:text-green-800"
+                  className="mt-3 inline-flex items-center gap-2 px-4 py-2 bg-[#0088cc] text-white text-sm font-medium rounded-lg hover:bg-[#0077b5] transition-colors"
+                  onClick={() => {
+                    track("telegram_link_clicked", { link: telegramLink });
+                  }}
                 >
+                  <FaTelegram className="w-5 h-5" />
                   Открыть в Telegram
                 </a>
               )}
@@ -675,12 +681,19 @@ export default function BrowsePage() {
                             console.log("[BrowsePage] requestContacts result:", result);
                             if (result.error) {
                               setError(result.error || "Не удалось запросить контакты");
+                              setTelegramLink(null);
                             } else {
                               // Show contacts
                               let contactsMsg = "✅ Контакты создателя объявления:\n\n";
-                              if (result.username && result.username.trim()) {
-                                contactsMsg += `Telegram: @${result.username}\n`;
-                                contactsMsg += `Ссылка: https://t.me/${result.username}`;
+                              const username = result.username;
+                              let link = "";
+                              
+                              if (username && typeof username === 'string' && username.trim()) {
+                                contactsMsg += `Telegram: @${username}`;
+                                link = `https://t.me/${username}`;
+                              } else if (result.tg_user_id) {
+                                contactsMsg += `ID пользователя: ${result.tg_user_id}`;
+                                link = `tg://user?id=${result.tg_user_id}`;
                               } else {
                                 contactsMsg += "Контакты не указаны (пользователь не указал username в Telegram)";
                               }
@@ -688,14 +701,19 @@ export default function BrowsePage() {
 
                               // Show success message with contacts
                               const originalError = error;
+                              const originalLink = telegramLink;
                               setError(contactsMsg);
+                              setTelegramLink(link || null);
+                              
                               setTimeout(() => {
                                 setError(originalError);
+                                setTelegramLink(originalLink);
                               }, 8000);
                             }
                           } catch (err) {
                             console.error("[BrowsePage] requestContacts error:", err);
                             setError("Произошла ошибка при запросе контактов");
+                            setTelegramLink(null);
                           }
                         }}
                       >

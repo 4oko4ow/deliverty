@@ -491,44 +491,26 @@ func requestContacts(pool *pgxpool.Pool) gin.HandlerFunc {
 
 		// Check if request already exists
 		var existingID int64
+		var contactRequestID int64
 		err = pool.QueryRow(c, `
 			SELECT id FROM contact_request
 			WHERE publication_id=$1 AND requester_user_id=$2
 		`, pubID, requesterUID).Scan(&existingID)
 		if err == nil {
-			// Request already exists, check status
-			var status string
-			_ = pool.QueryRow(c, `SELECT status FROM contact_request WHERE id=$1`, existingID).Scan(&status)
-			if status == "agreed" {
-				// Return contacts even if already shared
-				c.JSON(http.StatusOK, gin.H{
-					"ok":         true,
-					"username":   ownerUsername,
-					"tg_user_id": ownerTGID,
-					"message":    "contacts already shared",
-				})
+			// Request already exists
+			contactRequestID = existingID
+		} else {
+			// Create new contact request
+			err = pool.QueryRow(c, `
+				INSERT INTO contact_request (publication_id, requester_user_id, status)
+				VALUES ($1, $2, 'pending')
+				RETURNING id
+			`, pubID, requesterUID).Scan(&contactRequestID)
+			if err != nil {
+				log.Printf("[PUBLICATIONS] Contact request insert error: %v", err)
+				c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to create request"})
 				return
 			}
-			// If pending, return contacts anyway
-			c.JSON(http.StatusOK, gin.H{
-				"ok":         true,
-				"username":   ownerUsername,
-				"tg_user_id": ownerTGID,
-			})
-			return
-		}
-
-		// Create contact request
-		var contactRequestID int64
-		err = pool.QueryRow(c, `
-			INSERT INTO contact_request (publication_id, requester_user_id, status)
-			VALUES ($1, $2, 'pending')
-			RETURNING id
-		`, pubID, requesterUID).Scan(&contactRequestID)
-		if err != nil {
-			log.Printf("[PUBLICATIONS] Contact request insert error: %v", err)
-			c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to create request"})
-			return
 		}
 
 		// Get publication details for notifications
@@ -536,10 +518,15 @@ func requestContacts(pool *pgxpool.Pool) gin.HandlerFunc {
 		var pubItem, pubWeight string
 		var pubDate sql.NullTime
 		var pubDateStart, pubDateEnd sql.NullTime
-		_ = pool.QueryRow(c, `
+		err = pool.QueryRow(c, `
 			SELECT from_iata, to_iata, description, item, weight, date, date_start, date_end
 			FROM publication WHERE id=$1
 		`, pubID).Scan(&pubFrom, &pubTo, &pubDescription, &pubItem, &pubWeight, &pubDate, &pubDateStart, &pubDateEnd)
+		if err != nil {
+			log.Printf("[PUBLICATIONS] Failed to get publication details: %v", err)
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to get publication details"})
+			return
+		}
 
 		// Format publication date
 		var dateStr string
@@ -578,7 +565,7 @@ func requestContacts(pool *pgxpool.Pool) gin.HandlerFunc {
 			ownerUsernameText = "@" + ownerUsernameText
 		}
 
-		// Message to requester
+		// Message to requester - always send info about publication and owner contacts
 		requesterMsg := fmt.Sprintf("📋 Информация об объявлении:\n\n")
 		requesterMsg += fmt.Sprintf("📍 Маршрут: %s → %s\n", pubFrom, pubTo)
 		requesterMsg += fmt.Sprintf("📅 Дата: %s\n", dateStr)
@@ -590,52 +577,75 @@ func requestContacts(pool *pgxpool.Pool) gin.HandlerFunc {
 		if ownerUsername != "" {
 			requesterMsg += fmt.Sprintf("Telegram: @%s\n", ownerUsername)
 			requesterMsg += fmt.Sprintf("Ссылка: https://t.me/%s", ownerUsername)
+		} else if ownerTGID != 0 {
+			requesterMsg += fmt.Sprintf("ID: %d\n", ownerTGID)
+			requesterMsg += fmt.Sprintf("Ссылка: tg://user?id=%d", ownerTGID)
 		} else {
 			requesterMsg += "Контакты не указаны (пользователь не указал username в Telegram)"
 		}
 
 		if requesterTGID != 0 {
-			_, _ = tg.API("sendMessage", gin.H{
+			_, err := tg.API("sendMessage", gin.H{
 				"chat_id": requesterTGID,
 				"text":    requesterMsg,
 			})
+			if err != nil {
+				log.Printf("[PUBLICATIONS] Failed to send message to requester: %v", err)
+			}
 		}
 
-		// Message to publication owner
+		// Message to publication owner - always send info about requester
 		ownerMsg := fmt.Sprintf("📋 Кто-то запросил контакты к вашему объявлению:\n\n")
 		ownerMsg += fmt.Sprintf("📍 Маршрут: %s → %s\n", pubFrom, pubTo)
 		ownerMsg += fmt.Sprintf("📅 Дата: %s\n", dateStr)
-		ownerMsg += fmt.Sprintf("📦 Тип: %s, %s\n\n", itemText, weightText)
+		ownerMsg += fmt.Sprintf("📦 Тип: %s, %s\n", itemText, weightText)
+		if pubDescription != "" {
+			ownerMsg += fmt.Sprintf("📝 Описание: %s\n\n", pubDescription)
+		}
 		ownerMsg += fmt.Sprintf("👤 Контакты запросившего:\n")
 		if requesterUsername != "" {
 			ownerMsg += fmt.Sprintf("Telegram: @%s\n", requesterUsername)
 			ownerMsg += fmt.Sprintf("Ссылка: https://t.me/%s", requesterUsername)
+		} else if requesterTGID != 0 {
+			ownerMsg += fmt.Sprintf("ID: %d\n", requesterTGID)
+			ownerMsg += fmt.Sprintf("Ссылка: tg://user?id=%d", requesterTGID)
 		} else {
 			ownerMsg += "Контакты не указаны (пользователь не указал username в Telegram)"
 		}
 
-		// Create inline keyboard with buttons
-		keyboard := gin.H{
-			"inline_keyboard": [][]gin.H{
-				{
+		// Create inline keyboard with buttons (only if request is pending)
+		var keyboard gin.H
+		var status string
+		_ = pool.QueryRow(c, `SELECT status FROM contact_request WHERE id=$1`, contactRequestID).Scan(&status)
+		if status == "pending" {
+			keyboard = gin.H{
+				"inline_keyboard": [][]gin.H{
 					{
-						"text":          "✅ Договорились",
-						"callback_data": fmt.Sprintf("contact_agreed:%d", contactRequestID),
-					},
-					{
-						"text":          "❌ Не договорились",
-						"callback_data": fmt.Sprintf("contact_declined:%d", contactRequestID),
+						{
+							"text":          "✅ Договорились",
+							"callback_data": fmt.Sprintf("contact_agreed:%d", contactRequestID),
+						},
+						{
+							"text":          "❌ Не договорились",
+							"callback_data": fmt.Sprintf("contact_declined:%d", contactRequestID),
+						},
 					},
 				},
-			},
+			}
 		}
 
 		if ownerTGID != 0 {
-			_, _ = tg.API("sendMessage", gin.H{
-				"chat_id":      ownerTGID,
-				"text":         ownerMsg,
-				"reply_markup": keyboard,
-			})
+			msgParams := gin.H{
+				"chat_id": ownerTGID,
+				"text":    ownerMsg,
+			}
+			if keyboard != nil {
+				msgParams["reply_markup"] = keyboard
+			}
+			_, err := tg.API("sendMessage", msgParams)
+			if err != nil {
+				log.Printf("[PUBLICATIONS] Failed to send message to owner: %v", err)
+			}
 		}
 
 		// Return owner's contact info to requester
