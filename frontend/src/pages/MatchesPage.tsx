@@ -452,7 +452,7 @@ export default function MatchesPage() {
                             <span className="text-xs sm:text-xs">Лечу, могу доставить</span>
                           </span>
                         )}
-                        <UserRating rating={r.user_rating || 0} username={r.username} />
+                        <UserRating rating={r.user_rating || 0} />
                       </div>
                       <div className={`badge ${getScoreColor(r.score)} font-semibold`}>
                         <HiOutlineSparkles className="w-3 h-3 sm:w-3 sm:h-3" />

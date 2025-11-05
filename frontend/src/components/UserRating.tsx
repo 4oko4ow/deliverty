@@ -5,9 +5,10 @@ interface UserRatingProps {
   rating: number;
   username?: string;
   className?: string;
+  showUsername?: boolean; // Показывать username только если явно указано
 }
 
-export default function UserRating({ rating, username, className = "" }: UserRatingProps) {
+export default function UserRating({ rating, username, className = "", showUsername = false }: UserRatingProps) {
   if (rating === 0 && !username) {
     return null;
   }
@@ -17,7 +18,7 @@ export default function UserRating({ rating, username, className = "" }: UserRat
 
   return (
     <div className={`flex items-center gap-1.5 ${className}`}>
-      {username && (
+      {showUsername && username && (
         <span className="text-xs text-gray-600">@{username}</span>
       )}
       <div className="flex items-center gap-0.5">

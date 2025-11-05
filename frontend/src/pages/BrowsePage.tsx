@@ -462,7 +462,7 @@ export default function BrowsePage() {
                             <span className="text-xs sm:text-xs">Лечу</span>
                           </span>
                         )}
-                        <UserRating rating={r.user_rating || 0} username={r.username} />
+                        <UserRating rating={r.user_rating || 0} />
                       </div>
                     </div>
 
