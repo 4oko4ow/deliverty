@@ -25,6 +25,11 @@ export default function PublishPage() {
     const track = (eventName: string, properties?: Record<string, any>) => {
         if (posthog) {
             posthog.capture(eventName, properties);
+            if (import.meta.env.DEV) {
+                console.log(`[PostHog] Tracked: ${eventName}`, properties);
+            }
+        } else if (import.meta.env.DEV) {
+            console.warn(`[PostHog] Skipped: ${eventName} (PostHog not ready)`, properties);
         }
     };
 
@@ -32,11 +37,17 @@ export default function PublishPage() {
     useEffect(() => {
         if (posthog) {
             const urlKind = searchParams.get("kind");
-            posthog.capture("publish_page_viewed", {
+            const properties = {
                 kind: urlKind || null,
                 from_url_param: searchParams.get("from") || null,
                 to_url_param: searchParams.get("to") || null,
-            });
+            };
+            posthog.capture("publish_page_viewed", properties);
+            if (import.meta.env.DEV) {
+                console.log("[PostHog] Tracked: publish_page_viewed", properties);
+            }
+        } else if (import.meta.env.DEV) {
+            console.warn("[PostHog] Skipped: publish_page_viewed (PostHog not ready)");
         }
     }, [posthog, searchParams]); // Track when PostHog is ready and searchParams change
 

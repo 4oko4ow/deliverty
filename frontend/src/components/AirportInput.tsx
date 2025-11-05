@@ -1,7 +1,7 @@
 import React, { useEffect, useState, useRef } from "react";
 import { api } from "../lib/api";
 import { HiOutlineLocationMarker, HiOutlineSearch, HiOutlineX } from "react-icons/hi";
-import { usePostHogAnalytics } from "../lib/posthog";
+import { usePostHog } from "posthog-js/react";
 
 export default function AirportInput({
   label,
@@ -12,7 +12,19 @@ export default function AirportInput({
   value: string;
   onChange: (v: string) => void;
 }) {
-  const { track } = usePostHogAnalytics();
+  const posthog = usePostHog();
+  
+  // Helper function to track events
+  const track = (eventName: string, properties?: Record<string, any>) => {
+    if (posthog) {
+      posthog.capture(eventName, properties);
+      if (import.meta.env.DEV) {
+        console.log(`[PostHog] Tracked: ${eventName}`, properties);
+      }
+    } else if (import.meta.env.DEV) {
+      console.warn(`[PostHog] Skipped: ${eventName} (PostHog not ready)`, properties);
+    }
+  };
   const [q, setQ] = useState("");
   const [opts, setOpts] = useState<any[]>([]);
   const [loading, setLoading] = useState(false);

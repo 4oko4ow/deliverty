@@ -25,6 +25,11 @@ export default function ProfilePage() {
   const track = (eventName: string, properties?: Record<string, any>) => {
     if (posthog) {
       posthog.capture(eventName, properties);
+      if (import.meta.env.DEV) {
+        console.log(`[PostHog] Tracked: ${eventName}`, properties);
+      }
+    } else if (import.meta.env.DEV) {
+      console.warn(`[PostHog] Skipped: ${eventName} (PostHog not ready)`, properties);
     }
   };
 
