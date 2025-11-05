@@ -508,8 +508,8 @@ export default function BrowsePage() {
 
         {error && (
           <div className={`flex items-start gap-2 p-4 border rounded-lg ${error.includes("Контакты создателя") || error.includes("Создатель объявления получил")
-              ? "bg-green-50 border-green-200"
-              : "bg-red-50 border-red-200"
+            ? "bg-green-50 border-green-200"
+            : "bg-red-50 border-red-200"
             }`}>
             {error.includes("Контакты создателя") || error.includes("Создатель объявления получил") ? (
               <HiOutlineCheckCircle className="w-5 h-5 text-green-600 flex-shrink-0 mt-0.5" />
@@ -518,8 +518,8 @@ export default function BrowsePage() {
             )}
             <div className="flex-1">
               <p className={`text-sm whitespace-pre-line ${error.includes("Контакты создателя") || error.includes("Создатель объявления получил")
-                  ? "text-green-700"
-                  : "text-red-700"
+                ? "text-green-700"
+                : "text-red-700"
                 }`}>{error}</p>
               {error.includes("t.me/") && (
                 <a
@@ -672,22 +672,21 @@ export default function BrowsePage() {
 
                           try {
                             const result: any = await api.requestContacts(r.id);
+                            console.log("[BrowsePage] requestContacts result:", result);
                             if (result.error) {
                               setError(result.error || "Не удалось запросить контакты");
                             } else {
                               // Show contacts
-                              let contactsMsg = "Контакты создателя объявления:\n\n";
-                              if (result.username) {
+                              let contactsMsg = "✅ Контакты создателя объявления:\n\n";
+                              if (result.username && result.username.trim()) {
                                 contactsMsg += `Telegram: @${result.username}\n`;
                                 contactsMsg += `Ссылка: https://t.me/${result.username}`;
                               } else {
-                                contactsMsg += "Контакты не указаны";
+                                contactsMsg += "Контакты не указаны (пользователь не указал username в Telegram)";
                               }
                               contactsMsg += "\n\nСоздатель объявления получил уведомление о запросе.";
 
                               // Show success message with contacts
-                              setError(null);
-                              // Temporary success message
                               const originalError = error;
                               setError(contactsMsg);
                               setTimeout(() => {
@@ -695,6 +694,7 @@ export default function BrowsePage() {
                               }, 8000);
                             }
                           } catch (err) {
+                            console.error("[BrowsePage] requestContacts error:", err);
                             setError("Произошла ошибка при запросе контактов");
                           }
                         }}

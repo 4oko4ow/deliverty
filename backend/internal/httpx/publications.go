@@ -181,7 +181,18 @@ func listPublications(pool *pgxpool.Pool) gin.HandlerFunc {
 			args = append(args, kind)
 		}
 
-		qry += " ORDER BY p.created_at DESC LIMIT 50"
+		// Sort by date proximity: closer dates first
+		// For trips: use date field, for requests: use date_start
+		// Use ABS to get distance from current date, then sort ascending (closer = smaller difference)
+		qry += `
+		  ORDER BY 
+		    CASE 
+		      WHEN p.kind = 'trip' AND p.date IS NOT NULL THEN ABS(EXTRACT(EPOCH FROM (p.date - CURRENT_DATE)))
+		      WHEN p.kind = 'request' AND p.date_start IS NOT NULL THEN ABS(EXTRACT(EPOCH FROM (p.date_start - CURRENT_DATE)))
+		      ELSE 999999999
+		    END ASC,
+		    p.created_at DESC
+		  LIMIT 50`
 
 		rows, err := pool.Query(c, qry, args...)
 		if err != nil {
@@ -489,11 +500,21 @@ func requestContacts(pool *pgxpool.Pool) gin.HandlerFunc {
 			var status string
 			_ = pool.QueryRow(c, `SELECT status FROM contact_request WHERE id=$1`, existingID).Scan(&status)
 			if status == "agreed" {
-				c.JSON(http.StatusOK, gin.H{"ok": true, "message": "contacts already shared"})
+				// Return contacts even if already shared
+				c.JSON(http.StatusOK, gin.H{
+					"ok":         true,
+					"username":   ownerUsername,
+					"tg_user_id": ownerTGID,
+					"message":    "contacts already shared",
+				})
 				return
 			}
-			// If pending, just return success
-			c.JSON(http.StatusOK, gin.H{"ok": true})
+			// If pending, return contacts anyway
+			c.JSON(http.StatusOK, gin.H{
+				"ok":         true,
+				"username":   ownerUsername,
+				"tg_user_id": ownerTGID,
+			})
 			return
 		}
 
@@ -510,16 +531,88 @@ func requestContacts(pool *pgxpool.Pool) gin.HandlerFunc {
 			return
 		}
 
-		// Send notification to publication owner via bot
-		tg := bot.New()
-		usernameText := requesterUsername
-		if usernameText == "" {
-			usernameText = "пользователь"
-		} else {
-			usernameText = "@" + usernameText
+		// Get publication details for notifications
+		var pubFrom, pubTo, pubDescription string
+		var pubItem, pubWeight string
+		var pubDate sql.NullTime
+		var pubDateStart, pubDateEnd sql.NullTime
+		_ = pool.QueryRow(c, `
+			SELECT from_iata, to_iata, description, item, weight, date, date_start, date_end
+			FROM publication WHERE id=$1
+		`, pubID).Scan(&pubFrom, &pubTo, &pubDescription, &pubItem, &pubWeight, &pubDate, &pubDateStart, &pubDateEnd)
+
+		// Format publication date
+		var dateStr string
+		if pubKind == "trip" && pubDate.Valid {
+			dateStr = pubDate.Time.Format("02.01.2006")
+		} else if pubDateStart.Valid && pubDateEnd.Valid {
+			dateStr = fmt.Sprintf("%s - %s", pubDateStart.Time.Format("02.01.2006"), pubDateEnd.Time.Format("02.01.2006"))
 		}
 
-		messageText := fmt.Sprintf("Ваши контакты были отправлены юзеру %s", usernameText)
+		// Format item and weight
+		itemText := "Документы"
+		if pubItem == "small" {
+			itemText = "Мелкие вещи"
+		}
+		weightText := "Конверт"
+		if pubWeight == "le1kg" {
+			weightText = "До 1 кг"
+		} else if pubWeight == "le3kg" {
+			weightText = "До 3 кг"
+		}
+
+		tg := bot.New()
+
+		// Send notification to requester with owner's contact and publication info
+		requesterUsernameText := requesterUsername
+		if requesterUsernameText == "" {
+			requesterUsernameText = "пользователь"
+		} else {
+			requesterUsernameText = "@" + requesterUsernameText
+		}
+
+		ownerUsernameText := ownerUsername
+		if ownerUsernameText == "" {
+			ownerUsernameText = "пользователь"
+		} else {
+			ownerUsernameText = "@" + ownerUsernameText
+		}
+
+		// Message to requester
+		requesterMsg := fmt.Sprintf("📋 Информация об объявлении:\n\n")
+		requesterMsg += fmt.Sprintf("📍 Маршрут: %s → %s\n", pubFrom, pubTo)
+		requesterMsg += fmt.Sprintf("📅 Дата: %s\n", dateStr)
+		requesterMsg += fmt.Sprintf("📦 Тип: %s, %s\n", itemText, weightText)
+		if pubDescription != "" {
+			requesterMsg += fmt.Sprintf("📝 Описание: %s\n\n", pubDescription)
+		}
+		requesterMsg += fmt.Sprintf("👤 Контакты создателя:\n")
+		if ownerUsername != "" {
+			requesterMsg += fmt.Sprintf("Telegram: @%s\n", ownerUsername)
+			requesterMsg += fmt.Sprintf("Ссылка: https://t.me/%s", ownerUsername)
+		} else {
+			requesterMsg += "Контакты не указаны (пользователь не указал username в Telegram)"
+		}
+
+		if requesterTGID != 0 {
+			_, _ = tg.API("sendMessage", gin.H{
+				"chat_id": requesterTGID,
+				"text":    requesterMsg,
+			})
+		}
+
+		// Message to publication owner
+		ownerMsg := fmt.Sprintf("📋 Кто-то запросил контакты к вашему объявлению:\n\n")
+		ownerMsg += fmt.Sprintf("📍 Маршрут: %s → %s\n", pubFrom, pubTo)
+		ownerMsg += fmt.Sprintf("📅 Дата: %s\n", dateStr)
+		ownerMsg += fmt.Sprintf("📦 Тип: %s, %s\n\n", itemText, weightText)
+		ownerMsg += fmt.Sprintf("👤 Контакты запросившего:\n")
+		if requesterUsername != "" {
+			ownerMsg += fmt.Sprintf("Telegram: @%s\n", requesterUsername)
+			ownerMsg += fmt.Sprintf("Ссылка: https://t.me/%s", requesterUsername)
+		} else {
+			ownerMsg += "Контакты не указаны (пользователь не указал username в Telegram)"
+		}
 
 		// Create inline keyboard with buttons
 		keyboard := gin.H{
@@ -537,11 +630,13 @@ func requestContacts(pool *pgxpool.Pool) gin.HandlerFunc {
 			},
 		}
 
-		_, _ = tg.API("sendMessage", gin.H{
-			"chat_id":      ownerTGID,
-			"text":         messageText,
-			"reply_markup": keyboard,
-		})
+		if ownerTGID != 0 {
+			_, _ = tg.API("sendMessage", gin.H{
+				"chat_id":      ownerTGID,
+				"text":         ownerMsg,
+				"reply_markup": keyboard,
+			})
+		}
 
 		// Return owner's contact info to requester
 		c.JSON(http.StatusOK, gin.H{
