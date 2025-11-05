@@ -637,9 +637,9 @@ export default function BrowsePage() {
                       return null;
                     })()}
 
-                    <div className="flex items-center justify-end gap-2 pt-4 border-t border-gray-100">
+                    <div className="flex items-center justify-end pt-4 border-t border-gray-100">
                       <button
-                        className="btn btn-secondary text-xs sm:text-sm px-4 py-2"
+                        className="btn btn-primary text-xs sm:text-sm px-4 py-2"
                         onClick={async () => {
                           track("request_contacts_clicked", {
                             pub_id: r.id,
@@ -669,32 +669,6 @@ export default function BrowsePage() {
                         }}
                       >
                         Показать контакты
-                      </button>
-                      <button
-                        className="btn btn-primary text-xs sm:text-sm px-4 py-2"
-                        onClick={() => {
-                          track("result_clicked", {
-                            pub_id: r.id,
-                            pub_kind: r.kind,
-                            from_iata: r.from_iata,
-                            to_iata: r.to_iata,
-                            user_filter_kind: kindFilter,
-                            result_index: idx,
-                          });
-                          makeDeal(r);
-                        }}
-                        disabled={creating === r.id}
-                      >
-                        {creating === r.id ? (
-                          <>
-                            <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
-                            Подождите...
-                          </>
-                        ) : (
-                          <>
-                            Открыть чат в Telegram
-                          </>
-                        )}
                       </button>
                     </div>
                   </div>
