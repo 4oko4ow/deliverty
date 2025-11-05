@@ -27,3 +27,4 @@ export function formatKind(kind: string): string {
   return t.kind[kind as keyof typeof t.kind] || kind;
 }
 
+

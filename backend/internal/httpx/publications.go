@@ -168,12 +168,26 @@ func listPublications(pool *pgxpool.Pool) gin.HandlerFunc {
 		to := c.Query("to")
 		kind := c.Query("kind") // optional
 
+		// Build query with city-based matching
+		// Match publications where from_iata/to_iata are in the same city as the search airports
 		qry := `
 		  SELECT p.id, p.kind, p.from_iata, p.to_iata, p.date_start, p.date_end, p.date, p.item, p.weight, p.reward_hint, p.description,
 		         COALESCE(u.rating_small, 0), COALESCE(u.tg_username, '')
 		  FROM publication p
 		  LEFT JOIN app_user u ON u.id = p.user_id
-		  WHERE p.is_active AND p.from_iata=$1 AND p.to_iata=$2`
+		  LEFT JOIN airport a_from ON a_from.iata = p.from_iata
+		  LEFT JOIN airport a_to ON a_to.iata = p.to_iata
+		  LEFT JOIN airport a_from_search ON a_from_search.iata = $1
+		  LEFT JOIN airport a_to_search ON a_to_search.iata = $2
+		  WHERE p.is_active
+		    AND (
+		      -- Match by exact IATA or by city
+		      a_from.iata = $1 OR (a_from.city IS NOT NULL AND a_from.city = a_from_search.city)
+		    )
+		    AND (
+		      -- Match by exact IATA or by city
+		      a_to.iata = $2 OR (a_to.city IS NOT NULL AND a_to.city = a_to_search.city)
+		    )`
 		args := []any{from, to}
 
 		if kind != "" {
@@ -321,7 +335,20 @@ func listMyPublications(pool *pgxpool.Pool) gin.HandlerFunc {
 		args := []any{uid}
 
 		if from != "" && to != "" {
-			qry += " AND p.from_iata=$2 AND p.to_iata=$3"
+			// Support city-based matching for my publications search
+			qry += `
+			  AND EXISTS (
+			    SELECT 1 FROM airport a_from, airport a_from_search
+			    WHERE a_from.iata = p.from_iata 
+			      AND a_from_search.iata = $2
+			      AND (a_from.iata = $2 OR (a_from.city IS NOT NULL AND a_from.city = a_from_search.city))
+			  )
+			  AND EXISTS (
+			    SELECT 1 FROM airport a_to, airport a_to_search
+			    WHERE a_to.iata = p.to_iata
+			      AND a_to_search.iata = $3
+			      AND (a_to.iata = $3 OR (a_to.city IS NOT NULL AND a_to.city = a_to_search.city))
+			  )`
 			args = append(args, from, to)
 		}
 

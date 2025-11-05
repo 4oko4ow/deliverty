@@ -45,3 +45,4 @@ ssh "$SERVER" "sudo systemctl restart deliverty-api"
 echo "=== Deployment Complete ==="
 echo "API: $DEPLOY_PATH/api"
 echo "Frontend: $FRONTEND_PATH"
+

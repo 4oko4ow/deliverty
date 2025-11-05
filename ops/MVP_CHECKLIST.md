@@ -119,3 +119,4 @@ sudo journalctl -u deliverty-api -f
 ## Ready for MVP Launch
 
 Once all items are checked, the platform is ready for MVP launch! 🚀
+

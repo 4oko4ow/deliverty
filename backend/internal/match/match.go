@@ -31,3 +31,4 @@ func WeightOK(req, trip string) bool {
 	order := map[string]int{"envelope": 0, "le1kg": 1, "le3kg": 2}
 	return order[trip] >= order[req]
 }
+

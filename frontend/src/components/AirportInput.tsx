@@ -1,7 +1,21 @@
-import React, { useEffect, useState, useRef } from "react";
+import React, { useEffect, useState, useRef, useMemo } from "react";
 import { api } from "../lib/api";
 import { HiOutlineLocationMarker, HiOutlineSearch, HiOutlineX } from "react-icons/hi";
 import { usePostHog } from "posthog-js/react";
+
+type Airport = {
+  IATA: string;
+  Name: string;
+  City: string;
+  Country: string;
+  TZ: string;
+};
+
+type CityGroup = {
+  city: string;
+  country: string;
+  airports: Airport[];
+};
 
 export default function AirportInput({
   label,
@@ -26,42 +40,63 @@ export default function AirportInput({
     }
   };
   const [q, setQ] = useState("");
-  const [opts, setOpts] = useState<any[]>([]);
+  const [airports, setAirports] = useState<Airport[]>([]);
   const [loading, setLoading] = useState(false);
   const [showDropdown, setShowDropdown] = useState(false);
   const wrapperRef = useRef<HTMLDivElement>(null);
+  
+  // Group airports by city
+  const cityGroups = useMemo(() => {
+    const groups = new Map<string, CityGroup>();
+    airports.forEach((airport) => {
+      const key = `${airport.City}|${airport.Country}`;
+      if (!groups.has(key)) {
+        groups.set(key, {
+          city: airport.City,
+          country: airport.Country,
+          airports: [],
+        });
+      }
+      groups.get(key)!.airports.push(airport);
+    });
+    // Sort airports within each city by IATA
+    groups.forEach((group) => {
+      group.airports.sort((a, b) => a.IATA.localeCompare(b.IATA));
+    });
+    return Array.from(groups.values()).sort((a, b) => a.city.localeCompare(b.city));
+  }, [airports]);
 
   useEffect(() => {
-    // Don't search if value is already set and q matches the selected format (IATA — Name)
+    // Don't search if value is already set and q matches the selected format
     // This prevents searching after selection
-    if (value && q.includes(" — ")) {
-      setOpts([]);
+    if (value && (q.includes(" — ") || q.includes(" (любой аэропорт)"))) {
+      setAirports([]);
       setShowDropdown(false);
       return;
     }
     
     if (q.length < 2) {
-      setOpts([]);
+      setAirports([]);
       setShowDropdown(false);
       return;
     }
     setLoading(true);
-    let a = true;
+    let cancelled = false;
     api.airports(q).then((x) => {
-      if (a) {
-        setOpts(Array.isArray(x) ? x : []);
+      if (!cancelled) {
+        setAirports(Array.isArray(x) ? x : []);
         setShowDropdown(true);
         setLoading(false);
       }
     }).catch(() => {
-      if (a) {
-        setOpts([]);
+      if (!cancelled) {
+        setAirports([]);
         setShowDropdown(false);
         setLoading(false);
       }
     });
     return () => {
-      a = false;
+      cancelled = true;
       setLoading(false);
     };
   }, [q, value]);
@@ -76,17 +111,57 @@ export default function AirportInput({
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, []);
 
-  const handleSelect = (iata: string, name: string) => {
-    onChange(iata);
-    // Set the display text but don't trigger search again
-    setQ(`${iata} — ${name}`);
-    setShowDropdown(false);
-    setOpts([]); // Clear options to prevent showing dropdown again
+  // Store city info for display when value is set but airports haven't loaded yet
+  const [selectedCityInfo, setSelectedCityInfo] = useState<{city: string, isCity: boolean} | null>(null);
+  
+  // Get display text for current value
+  const getDisplayText = () => {
+    if (!value) return "";
     
-    // Track airport selection
+    // If we have city info stored, use it
+    if (selectedCityInfo && selectedCityInfo.isCity) {
+      return `${selectedCityInfo.city} (любой аэропорт)`;
+    }
+    
+    // Find airport by IATA
+    const airport = airports.find(a => a.IATA === value);
+    if (airport) {
+      return `${airport.IATA} — ${airport.Name}`;
+    }
+    return value;
+  };
+
+  const handleSelectCity = (city: string, country: string, airports: Airport[]) => {
+    // Use the first airport's IATA as the stored value
+    // Backend will handle city-based matching
+    const firstIata = airports[0].IATA;
+    // Store IATA but we'll track that it's a city selection
+    onChange(firstIata);
+    setQ(`${city} (любой аэропорт)`);
+    setSelectedCityInfo({ city: `${city}, ${country}`, isCity: true });
+    setShowDropdown(false);
+    setAirports([]);
+    
+    track("city_selected", {
+      city,
+      country,
+      airports_count: airports.length,
+      selected_iata: firstIata,
+      field_label: label,
+    });
+  };
+
+  const handleSelectAirport = (airport: Airport) => {
+    onChange(airport.IATA);
+    setQ(`${airport.IATA} — ${airport.Name}`);
+    setSelectedCityInfo({ city: airport.City, isCity: false });
+    setShowDropdown(false);
+    setAirports([]);
+    
     track("airport_selected", {
-      iata,
-      airport_name: name,
+      iata: airport.IATA,
+      airport_name: airport.Name,
+      city: airport.City,
       field_label: label,
     });
   };
@@ -94,7 +169,9 @@ export default function AirportInput({
   const clearSelection = () => {
     onChange("");
     setQ("");
+    setSelectedCityInfo(null);
     setShowDropdown(false);
+    setAirports([]);
   };
 
   return (
@@ -107,21 +184,23 @@ export default function AirportInput({
           <HiOutlineLocationMarker className="w-5 h-5 sm:w-5 sm:h-5 text-gray-400" />
         </div>
         <input
-          value={q}
+          value={q || getDisplayText()}
           onChange={(e) => {
-            setQ(e.target.value);
+            const newQ = e.target.value;
+            setQ(newQ);
             // If user starts typing, clear the value to allow new search
-            if (value && !e.target.value.includes(" — ")) {
+            if (value && !newQ.includes(" — ") && !newQ.includes(" (любой аэропорт)")) {
               onChange("");
+              setSelectedCityInfo(null);
             }
           }}
           onFocus={() => {
-            // Only show dropdown if we have search results and not already selected
-            if (q.length >= 2 && opts.length > 0 && !q.includes(" — ")) {
+            // Show dropdown if we have search results and not already selected
+            if (q.length >= 2 && airports.length > 0 && !q.includes(" — ") && !q.includes(" (любой аэропорт)")) {
               setShowDropdown(true);
             }
           }}
-          placeholder="Начните вводить название или код аэропорта"
+          placeholder="Начните вводить название города или аэропорта"
           className="input pl-10 sm:pl-10 pr-10 sm:pr-10"
         />
         {value && (
@@ -141,25 +220,49 @@ export default function AirportInput({
             <div className="p-4 text-center">
               <div className="w-5 h-5 sm:w-5 sm:h-5 border-2 border-primary-200 border-t-primary-600 rounded-full animate-spin mx-auto" />
             </div>
-          ) : opts.length === 0 ? (
+          ) : cityGroups.length === 0 ? (
             <div className="p-4 text-center text-sm sm:text-sm text-gray-500">
               Аэропорты не найдены
             </div>
           ) : (
-            opts.map((a) => (
-              <button
-                key={a.IATA}
-                className="w-full text-left px-4 py-3.5 sm:py-3 hover:bg-primary-50 active:bg-primary-100 transition-colors border-b border-gray-50 last:border-0 touch-manipulation"
-                onClick={() => handleSelect(a.IATA, a.Name)}
-              >
-                <div className="flex items-center justify-between gap-2">
-                  <div className="flex-1 min-w-0">
-                    <div className="font-semibold text-gray-900 text-base sm:text-sm truncate">{a.IATA}</div>
-                    <div className="text-sm sm:text-sm text-gray-600 truncate">{a.Name}</div>
-                  </div>
-                  <HiOutlineSearch className="w-4 h-4 sm:w-4 sm:h-4 text-gray-400 flex-shrink-0" />
-                </div>
-              </button>
+            cityGroups.map((group) => (
+              <div key={`${group.city}|${group.country}`} className="border-b border-gray-100 last:border-0">
+                {/* City option - show if multiple airports */}
+                {group.airports.length > 1 && (
+                  <button
+                    className="w-full text-left px-4 py-3.5 sm:py-3 hover:bg-primary-50 active:bg-primary-100 transition-colors border-b border-gray-50 touch-manipulation"
+                    onClick={() => handleSelectCity(group.city, group.country, group.airports)}
+                  >
+                    <div className="flex items-center justify-between gap-2">
+                      <div className="flex-1 min-w-0">
+                        <div className="font-semibold text-primary-700 text-base sm:text-sm truncate">
+                          {group.city}, {group.country}
+                        </div>
+                        <div className="text-xs sm:text-xs text-primary-600 truncate">
+                          Любой аэропорт ({group.airports.length} {group.airports.length === 1 ? 'аэропорт' : group.airports.length < 5 ? 'аэропорта' : 'аэропортов'})
+                        </div>
+                      </div>
+                      <HiOutlineSearch className="w-4 h-4 sm:w-4 sm:h-4 text-primary-500 flex-shrink-0" />
+                    </div>
+                  </button>
+                )}
+                {/* Individual airports */}
+                {group.airports.map((airport) => (
+                  <button
+                    key={airport.IATA}
+                    className="w-full text-left px-4 py-3.5 sm:py-3 hover:bg-gray-50 active:bg-gray-100 transition-colors border-b border-gray-50 last:border-0 touch-manipulation pl-8"
+                    onClick={() => handleSelectAirport(airport)}
+                  >
+                    <div className="flex items-center justify-between gap-2">
+                      <div className="flex-1 min-w-0">
+                        <div className="font-semibold text-gray-900 text-base sm:text-sm truncate">{airport.IATA}</div>
+                        <div className="text-sm sm:text-sm text-gray-600 truncate">{airport.Name}</div>
+                      </div>
+                      <HiOutlineSearch className="w-4 h-4 sm:w-4 sm:h-4 text-gray-400 flex-shrink-0" />
+                    </div>
+                  </button>
+                ))}
+              </div>
             ))
           )}
         </div>

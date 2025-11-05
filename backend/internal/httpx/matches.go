@@ -92,7 +92,7 @@ func findMatches(pool *pgxpool.Pool) gin.HandlerFunc {
 		var anchorUserID int64
 		_ = pool.QueryRow(c, `SELECT user_id FROM publication WHERE id=$1`, pubID).Scan(&anchorUserID)
 
-		// Build query based on opposite kind
+		// Build query based on opposite kind with city-based matching
 		var rows interface {
 			Close()
 			Err() error
@@ -100,34 +100,56 @@ func findMatches(pool *pgxpool.Pool) gin.HandlerFunc {
 			Scan(dest ...interface{}) error
 		}
 		if opp == "trip" {
-			// Looking for trips - use date field
+			// Looking for trips - use date field, match by city
 			rows, err = pool.Query(c, `
 				SELECT p.id, p.kind, p.from_iata, p.to_iata, p.date_start, p.date_end, p.date, p.item, p.weight,
 				       COALESCE(u.rating_small, 0), COALESCE(u.tg_username, '')
 				FROM publication p
 				JOIN app_user u ON u.id = p.user_id
+				LEFT JOIN airport a_from ON a_from.iata = p.from_iata
+				LEFT JOIN airport a_to ON a_to.iata = p.to_iata
+				LEFT JOIN airport a_from_search ON a_from_search.iata = $3
+				LEFT JOIN airport a_to_search ON a_to_search.iata = $4
 				WHERE p.is_active
 				  AND p.id != $1
 				  AND p.user_id != $7
 				  AND p.kind=$2::pub_type
-				  AND p.from_iata=$3 AND p.to_iata=$4
+				  AND (
+				    -- Match by exact IATA or by city
+				    a_from.iata = $3 OR (a_from.city IS NOT NULL AND a_from.city = a_from_search.city)
+				  )
+				  AND (
+				    -- Match by exact IATA or by city
+				    a_to.iata = $4 OR (a_to.city IS NOT NULL AND a_to.city = a_to_search.city)
+				  )
 				  AND p.date IS NOT NULL
 				  AND p.date >= $5 AND p.date <= $6
 				ORDER BY p.created_at DESC
 				LIMIT 50
 			`, pubID, opp, from, to, anchorStart, anchorEnd, anchorUserID)
 		} else {
-			// Looking for requests - use date_start/date_end
+			// Looking for requests - use date_start/date_end, match by city
 			rows, err = pool.Query(c, `
 				SELECT p.id, p.kind, p.from_iata, p.to_iata, p.date_start, p.date_end, p.date, p.item, p.weight,
 				       COALESCE(u.rating_small, 0), COALESCE(u.tg_username, '')
 				FROM publication p
 				JOIN app_user u ON u.id = p.user_id
+				LEFT JOIN airport a_from ON a_from.iata = p.from_iata
+				LEFT JOIN airport a_to ON a_to.iata = p.to_iata
+				LEFT JOIN airport a_from_search ON a_from_search.iata = $3
+				LEFT JOIN airport a_to_search ON a_to_search.iata = $4
 				WHERE p.is_active
 				  AND p.id != $1
 				  AND p.user_id != $7
 				  AND p.kind=$2::pub_type
-				  AND p.from_iata=$3 AND p.to_iata=$4
+				  AND (
+				    -- Match by exact IATA or by city
+				    a_from.iata = $3 OR (a_from.city IS NOT NULL AND a_from.city = a_from_search.city)
+				  )
+				  AND (
+				    -- Match by exact IATA or by city
+				    a_to.iata = $4 OR (a_to.city IS NOT NULL AND a_to.city = a_to_search.city)
+				  )
 				  AND NOT (p.date_end < $5 OR p.date_start > $6)
 				ORDER BY p.created_at DESC
 				LIMIT 50
