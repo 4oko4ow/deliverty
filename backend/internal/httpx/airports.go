@@ -1,6 +1,7 @@
 package httpx
 
 import (
+	"fmt"
 	"log"
 	"net/http"
 	"strings"
@@ -35,6 +36,41 @@ func transliterate(s string) string {
 	return result.String()
 }
 
+// generateSearchPatterns creates multiple search patterns for better matching
+// Handles variations like "kh" vs "h" in transliteration
+func generateSearchPatterns(q string) []string {
+	patternMap := make(map[string]bool)
+	patterns := []string{}
+	
+	// Add original query
+	original := "%" + q + "%"
+	if !patternMap[original] {
+		patternMap[original] = true
+		patterns = append(patterns, original)
+	}
+	
+	// Add transliterated version
+	qTranslit := transliterate(q)
+	translitPattern := "%" + qTranslit + "%"
+	if !patternMap[translitPattern] {
+		patternMap[translitPattern] = true
+		patterns = append(patterns, translitPattern)
+	}
+	
+	// Add variations with common transliteration differences
+	// "h" can be "kh" in some transliterations (e.g., Makhachkala)
+	if strings.Contains(qTranslit, "h") {
+		qWithKh := strings.ReplaceAll(qTranslit, "h", "kh")
+		khPattern := "%" + qWithKh + "%"
+		if !patternMap[khPattern] {
+			patternMap[khPattern] = true
+			patterns = append(patterns, khPattern)
+		}
+	}
+	
+	return patterns
+}
+
 func listAirports(pool *pgxpool.Pool) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		q := c.Query("q")
@@ -43,17 +79,26 @@ func listAirports(pool *pgxpool.Pool) gin.HandlerFunc {
 			return
 		}
 
-		// Create transliterated version for search
-		qTranslit := transliterate(q)
-		pattern := "%" + q + "%"
-		patternTranslit := "%" + qTranslit + "%"
+		// Generate multiple search patterns for better matching
+		patterns := generateSearchPatterns(q)
+		
+		// Build dynamic query with all patterns
+		whereClause := "WHERE ("
+		args := []interface{}{}
+		for i, pattern := range patterns {
+			if i > 0 {
+				whereClause += " OR "
+			}
+			whereClause += "(iata ILIKE $" + fmt.Sprintf("%d", i+1) + " OR name ILIKE $" + fmt.Sprintf("%d", i+1) + " OR city ILIKE $" + fmt.Sprintf("%d", i+1) + ")"
+			args = append(args, pattern)
+		}
+		whereClause += ")"
 
 		rows, err := pool.Query(c,
 			`SELECT iata, name, city, country, tz
 			 FROM airport
-			 WHERE (iata ILIKE $1 OR name ILIKE $1 OR city ILIKE $1
-			        OR iata ILIKE $2 OR name ILIKE $2 OR city ILIKE $2)
-			 ORDER BY iata LIMIT 20`, pattern, patternTranslit)
+			 `+whereClause+`
+			 ORDER BY iata LIMIT 20`, args...)
 		if err != nil {
 			log.Printf("ERROR: airports query failed: %v (query=%q)", err, q)
 			c.JSON(http.StatusInternalServerError, gin.H{"error": "db", "details": err.Error()})
