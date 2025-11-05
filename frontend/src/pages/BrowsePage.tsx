@@ -394,13 +394,13 @@ export default function BrowsePage() {
                       </div>
                     </div>
 
-                    {r.description && r.description.trim() && (
-                      <div className="mb-4 pt-4 border-t border-gray-100">
-                        <p className="text-sm text-gray-700 whitespace-pre-wrap line-clamp-2">{r.description}</p>
+                    {r.description && typeof r.description === "string" && r.description.trim().length > 0 && (
+                      <div className="mb-4 pt-3 border-t border-gray-100">
+                        <p className="text-sm text-gray-700 whitespace-pre-wrap line-clamp-3">{r.description}</p>
                       </div>
                     )}
 
-                    <div className="flex items-center justify-end pt-4 border-t border-gray-100 mt-4">
+                    <div className="flex items-center justify-end pt-4 border-t border-gray-100">
                       <button
                         className="btn btn-primary text-xs sm:text-sm px-4 py-2"
                         onClick={() => makeDeal(r)}

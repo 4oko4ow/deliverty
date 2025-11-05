@@ -21,7 +21,7 @@ export default function MatchesPage() {
     setError(null);
 
     // Fetch publication first
-    api.getPub(pubId!).then((pubData) => {
+    api.getPub(pubId!).then((pubData: any) => {
       if (a) {
         if (pubData.error) {
           setError(pubData.error || "Объявление не найдено");
