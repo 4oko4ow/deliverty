@@ -26,6 +26,8 @@ type MatchOut struct {
 	Item       string `json:"item"`
 	Weight     string `json:"weight"`
 	Score      int    `json:"score"`
+	UserRating int    `json:"user_rating"`
+	Username   string `json:"username"`
 }
 
 func RegisterMatchRoutes(g *gin.RouterGroup, pool *pgxpool.Pool) {
@@ -75,15 +77,17 @@ func findMatches(pool *pgxpool.Pool) gin.HandlerFunc {
 		_ = pool.QueryRow(c, `SELECT user_id FROM publication WHERE id=$1`, pubID).Scan(&anchorUserID)
 
 		rows, err := pool.Query(c, `
-			SELECT id, kind, from_iata, to_iata, date_start, date_end, item, weight
-			FROM publication
-			WHERE is_active
-			  AND id != $1
-			  AND user_id != $7
-			  AND kind=$2::pub_type
-			  AND from_iata=$3 AND to_iata=$4
-			  AND NOT (date_end < $5 OR date_start > $6)
-			ORDER BY created_at DESC
+			SELECT p.id, p.kind, p.from_iata, p.to_iata, p.date_start, p.date_end, p.item, p.weight,
+			       COALESCE(u.rating_small, 0), COALESCE(u.tg_username, '')
+			FROM publication p
+			JOIN app_user u ON u.id = p.user_id
+			WHERE p.is_active
+			  AND p.id != $1
+			  AND p.user_id != $7
+			  AND p.kind=$2::pub_type
+			  AND p.from_iata=$3 AND p.to_iata=$4
+			  AND NOT (p.date_end < $5 OR p.date_start > $6)
+			ORDER BY p.created_at DESC
 			LIMIT 50
 		`, pubID, opp, from, to, aStart, aEnd, anchorUserID)
 		if err != nil {
@@ -98,7 +102,9 @@ func findMatches(pool *pgxpool.Pool) gin.HandlerFunc {
 			var id int64
 			var k, f, t, it, w string
 			var ds, de time.Time
-			if err := rows.Scan(&id, &k, &f, &t, &ds, &de, &it, &w); err != nil {
+			var userRating int
+			var username string
+			if err := rows.Scan(&id, &k, &f, &t, &ds, &de, &it, &w, &userRating, &username); err != nil {
 				continue
 			}
 
@@ -123,6 +129,7 @@ func findMatches(pool *pgxpool.Pool) gin.HandlerFunc {
 				OtherPubID: id, Kind: k, From: f, To: t,
 				DateStart: ds.Format("2006-01-02"), DateEnd: de.Format("2006-01-02"),
 				Item: it, Weight: w, Score: score,
+				UserRating: userRating, Username: username,
 			})
 		}
 

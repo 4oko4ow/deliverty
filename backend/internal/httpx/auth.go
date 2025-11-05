@@ -115,7 +115,7 @@ func handleTelegramAuth(pool *pgxpool.Pool) gin.HandlerFunc {
 			if firstName != "" {
 				welcomeMsg = fmt.Sprintf("✅ Привет, %s! Авторизация успешна. Вы вошли в систему Deliverty.", firstName)
 			}
-			
+
 			// Use Bot API to send message (will only work if user started conversation)
 			_, _ = tg.API("sendMessage", map[string]any{
 				"chat_id": userID,
@@ -138,4 +138,3 @@ func handleTelegramAuth(pool *pgxpool.Pool) gin.HandlerFunc {
 		c.Redirect(http.StatusFound, frontendURL+"/auth?auth_success=1&user_id="+id)
 	}
 }
-

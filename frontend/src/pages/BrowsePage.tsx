@@ -1,13 +1,16 @@
 import { useState } from "react";
 import AirportInput from "../components/AirportInput";
+import UserRating from "../components/UserRating";
 import { api, isAuthenticated } from "../lib/api";
 import { useNavigate } from "react-router-dom";
-import { HiOutlineSearch, HiOutlineLocationMarker, HiOutlineCalendar, HiOutlineCube, HiArrowRight, HiOutlineExclamationCircle, HiOutlineSparkles } from "react-icons/hi";
+import { HiOutlineSearch, HiOutlineLocationMarker, HiOutlineCalendar, HiOutlineCube, HiArrowRight, HiOutlineExclamationCircle } from "react-icons/hi";
 import { HiOutlineTruck, HiOutlineGift } from "react-icons/hi2";
 import { formatItem, formatWeight } from "../lib/translations";
+import { usePostHogAnalytics } from "../lib/posthog";
 
 export default function BrowsePage() {
   const navigate = useNavigate();
+  const { track } = usePostHogAnalytics();
   const [from, setFrom] = useState("");
   const [to, setTo] = useState("");
   const [kindFilter, setKindFilter] = useState<"request" | "trip">("request");
@@ -20,11 +23,19 @@ export default function BrowsePage() {
   async function search() {
     if (!from || !to) {
       setError("Выберите аэропорты отправления и назначения");
+      track("search_error", { reason: "missing_airports" });
       return;
     }
     setError(null);
     setLoading(true);
     setSearched(true);
+
+    track("search_started", {
+      from_iata: from,
+      to_iata: to,
+      kind_filter: kindFilter,
+    });
+
     try {
       // Если выбран конкретный тип, ищем противоположный (совпадения)
       // Если kindFilter "all", не задаем searchKind - покажем все
@@ -44,6 +55,14 @@ export default function BrowsePage() {
           console.log("Description:", result[0].description);
         }
         setRows(result);
+
+        track("search_completed", {
+          from_iata: from,
+          to_iata: to,
+          kind_filter: kindFilter,
+          results_count: result.length,
+        });
+
         // Не загружаем совпадения на странице поиска - они будут показаны на странице детального просмотра
       } else if (result && typeof result === "object" && "error" in result) {
         setError(result.error || "Ошибка при поиске");
@@ -54,6 +73,12 @@ export default function BrowsePage() {
     } catch (err) {
       setError("Произошла ошибка при поиске. Попробуйте еще раз.");
       setRows([]);
+      track("search_error", {
+        from_iata: from,
+        to_iata: to,
+        kind_filter: kindFilter,
+        error: String(err),
+      });
     } finally {
       setLoading(false);
     }
@@ -62,12 +87,24 @@ export default function BrowsePage() {
   async function makeDeal(resultPub: any) {
     // Check authentication
     if (!isAuthenticated()) {
+      track("deal_attempted_not_authenticated", {
+        pub_id: resultPub.id,
+        pub_kind: resultPub.kind,
+      });
       navigate(`/auth?return=${encodeURIComponent(window.location.pathname + window.location.search)}`);
       return;
     }
 
     setCreating(resultPub.id);
     setError(null);
+
+    track("deal_started", {
+      pub_id: resultPub.id,
+      pub_kind: resultPub.kind,
+      from_iata: resultPub.from_iata,
+      to_iata: resultPub.to_iata,
+      user_filter_kind: kindFilter,
+    });
 
     try {
       // If user searches "Я ищу" (request), they see "trip" results
@@ -97,6 +134,11 @@ export default function BrowsePage() {
           if (newPub.error || !newPub.id) {
             setError(newPub.error || "Не удалось создать объявление");
             setCreating(null);
+            track("deal_error", {
+              pub_id: resultPub.id,
+              error: "failed_to_create_publication",
+              user_filter_kind: kindFilter,
+            });
             return;
           }
 
@@ -109,6 +151,11 @@ export default function BrowsePage() {
         if (res.error) {
           setError(res.error || "Не удалось создать сделку");
           setCreating(null);
+          track("deal_error", {
+            pub_id: resultPub.id,
+            error: res.error,
+            user_filter_kind: kindFilter,
+          });
           return;
         }
 
@@ -130,6 +177,15 @@ export default function BrowsePage() {
             window.open(telegramUrl, "_blank");
             setCreating(null);
 
+            track("deal_created", {
+              deal_id: res.id,
+              pub_id: resultPub.id,
+              pub_kind: resultPub.kind,
+              from_iata: resultPub.from_iata,
+              to_iata: resultPub.to_iata,
+              user_filter_kind: kindFilter,
+            });
+
             // Show success message briefly
             setTimeout(() => {
               setError(null);
@@ -138,6 +194,11 @@ export default function BrowsePage() {
           } else {
             setError(link.error || "Не удалось получить ссылку на чат");
             setCreating(null);
+            track("deal_error", {
+              pub_id: resultPub.id,
+              error: "no_telegram_link",
+              user_filter_kind: kindFilter,
+            });
             return;
           }
         }
@@ -203,6 +264,15 @@ export default function BrowsePage() {
             window.open(telegramUrl, "_blank");
             setCreating(null);
 
+            track("deal_created", {
+              deal_id: res.id,
+              pub_id: resultPub.id,
+              pub_kind: resultPub.kind,
+              from_iata: resultPub.from_iata,
+              to_iata: resultPub.to_iata,
+              user_filter_kind: kindFilter,
+            });
+
             // Show success message briefly
             setTimeout(() => {
               setError(null);
@@ -211,6 +281,11 @@ export default function BrowsePage() {
           } else {
             setError(link.error || "Не удалось получить ссылку на чат");
             setCreating(null);
+            track("deal_error", {
+              pub_id: resultPub.id,
+              error: "no_telegram_link",
+              user_filter_kind: kindFilter,
+            });
             return;
           }
         }
@@ -219,6 +294,11 @@ export default function BrowsePage() {
       console.error("[BrowsePage] makeDeal error", err);
       setError("Произошла ошибка. Попробуйте еще раз.");
       setCreating(null);
+      track("deal_error", {
+        pub_id: resultPub.id,
+        error: String(err),
+        user_filter_kind: kindFilter,
+      });
     }
   }
 
@@ -250,7 +330,10 @@ export default function BrowsePage() {
           <div className="grid grid-cols-2 gap-2">
             <button
               type="button"
-              onClick={() => setKindFilter("request")}
+              onClick={() => {
+                track("filter_changed", { filter: "request", from_iata: from, to_iata: to });
+                setKindFilter("request");
+              }}
               className={`px-3 py-3 sm:px-4 sm:py-3 rounded-lg border-2 transition-all text-sm sm:text-base flex items-center justify-center gap-2 touch-manipulation min-h-[56px] ${kindFilter === "request"
                 ? "border-primary-500 bg-primary-50 text-primary-900 font-semibold"
                 : "border-gray-200 hover:border-gray-300 active:bg-gray-50 text-gray-700"
@@ -261,7 +344,10 @@ export default function BrowsePage() {
             </button>
             <button
               type="button"
-              onClick={() => setKindFilter("trip")}
+              onClick={() => {
+                track("filter_changed", { filter: "trip", from_iata: from, to_iata: to });
+                setKindFilter("trip");
+              }}
               className={`px-3 py-3 sm:px-4 sm:py-3 rounded-lg border-2 transition-all text-sm sm:text-base flex items-center justify-center gap-2 touch-manipulation min-h-[56px] ${kindFilter === "trip"
                 ? "border-primary-500 bg-primary-50 text-primary-900 font-semibold"
                 : "border-gray-200 hover:border-gray-300 active:bg-gray-50 text-gray-700"
@@ -323,6 +409,7 @@ export default function BrowsePage() {
               <div className="flex flex-col sm:flex-row gap-3 justify-center">
                 <button
                   onClick={() => {
+                    track("search_cleared", { from_iata: from, to_iata: to, kind_filter: kindFilter });
                     setFrom("");
                     setTo("");
                     setSearched(false);
@@ -333,7 +420,15 @@ export default function BrowsePage() {
                   Очистить поиск
                 </button>
                 <button
-                  onClick={() => navigate(`/publish?kind=${kindFilter === "request" ? "request" : "trip"}&from=${from}&to=${to}`)}
+                  onClick={() => {
+                    track("navigate_to_publish", {
+                      from_search: true,
+                      kind: kindFilter === "request" ? "request" : "trip",
+                      from_iata: from,
+                      to_iata: to,
+                    });
+                    navigate(`/publish?kind=${kindFilter === "request" ? "request" : "trip"}&from=${from}&to=${to}`);
+                  }}
                   className="btn btn-primary"
                 >
                   Создать объявление
@@ -355,7 +450,7 @@ export default function BrowsePage() {
                     style={{ animationDelay: `${idx * 50}ms` }}
                   >
                     <div className="flex items-start justify-between mb-3">
-                      <div className="flex items-center gap-2">
+                      <div className="flex items-center gap-2 flex-wrap">
                         {r.kind === "request" ? (
                           <span className="badge-primary">
                             <HiOutlineGift className="w-3 h-3 sm:w-3 sm:h-3" />
@@ -367,6 +462,7 @@ export default function BrowsePage() {
                             <span className="text-xs sm:text-xs">Лечу</span>
                           </span>
                         )}
+                        <UserRating rating={r.user_rating || 0} username={r.username} />
                       </div>
                     </div>
 
@@ -414,7 +510,17 @@ export default function BrowsePage() {
                     <div className="flex items-center justify-end pt-4 border-t border-gray-100">
                       <button
                         className="btn btn-primary text-xs sm:text-sm px-4 py-2"
-                        onClick={() => makeDeal(r)}
+                        onClick={() => {
+                          track("result_clicked", {
+                            pub_id: r.id,
+                            pub_kind: r.kind,
+                            from_iata: r.from_iata,
+                            to_iata: r.to_iata,
+                            user_filter_kind: kindFilter,
+                            result_index: idx,
+                          });
+                          makeDeal(r);
+                        }}
                         disabled={creating === r.id}
                       >
                         {creating === r.id ? (

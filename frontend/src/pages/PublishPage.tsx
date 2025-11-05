@@ -4,9 +4,11 @@ import { api, isAuthenticated } from "../lib/api";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { HiOutlineCalendar, HiOutlineCube, HiOutlineExclamationCircle, HiOutlinePaperAirplane } from "react-icons/hi";
 import { HiOutlineSparkles, HiOutlineGift, HiOutlineTruck } from "react-icons/hi2";
+import { usePostHogAnalytics } from "../lib/posthog";
 
 export default function PublishPage() {
     const [searchParams] = useSearchParams();
+    const { track } = usePostHogAnalytics();
     const [kind, setKind] = useState<"request" | "trip">("request");
     const [from, setFrom] = useState("");
     const [to, setTo] = useState("");
@@ -42,12 +44,14 @@ export default function PublishPage() {
     async function submit() {
         // Check authentication before creating publication
         if (!isAuthenticated()) {
+            track("publish_attempted_not_authenticated", { kind });
             nav("/auth");
             return;
         }
 
         if (!from || !to || !dateStart || !dateEnd) {
             setError("Заполните все обязательные поля");
+            track("publish_error", { reason: "missing_fields", kind });
             return;
         }
 
@@ -58,15 +62,29 @@ export default function PublishPage() {
 
         if (daysDiff < 1) {
             setError("Дата окончания должна быть позже даты начала");
+            track("publish_error", { reason: "invalid_date_range", kind });
             return;
         }
         if (daysDiff > 14) {
             setError("Диапазон дат не должен превышать 14 дней");
+            track("publish_error", { reason: "date_range_too_long", kind });
             return;
         }
 
         setError(null);
         setSubmitting(true);
+        
+        track("publish_started", {
+            kind,
+            from_iata: from,
+            to_iata: to,
+            item,
+            weight,
+            has_flight_no: !!flightNo,
+            has_airline: !!airline,
+            has_description: !!desc,
+        });
+        
         try {
             const body: any = {
                 kind,
@@ -89,13 +107,42 @@ export default function PublishPage() {
             const res = await api.createPub(body);
             if ('error' in res) {
                 setError(res.error || "Ошибка при создании объявления");
+                track("publish_error", {
+                    kind,
+                    error: res.error,
+                    from_iata: from,
+                    to_iata: to,
+                });
             } else if ('id' in res) {
+                track("publish_completed", {
+                    pub_id: res.id,
+                    kind,
+                    from_iata: from,
+                    to_iata: to,
+                    item,
+                    weight,
+                    has_flight_no: !!flightNo,
+                    has_airline: !!airline,
+                    has_description: !!desc,
+                });
                 nav(`/matches/${res.id}`);
             } else {
                 setError("Не удалось создать объявление");
+                track("publish_error", {
+                    kind,
+                    error: "unknown_error",
+                    from_iata: from,
+                    to_iata: to,
+                });
             }
         } catch (err) {
             setError("Произошла ошибка. Попробуйте еще раз.");
+            track("publish_error", {
+                kind,
+                error: String(err),
+                from_iata: from,
+                to_iata: to,
+            });
         } finally {
             setSubmitting(false);
         }
@@ -123,7 +170,10 @@ export default function PublishPage() {
                     <div className="grid grid-cols-2 gap-2 sm:gap-3">
                         <button
                             type="button"
-                            onClick={() => setKind("request")}
+                            onClick={() => {
+                                track("publish_kind_changed", { kind: "request" });
+                                setKind("request");
+                            }}
                             className={`p-3 sm:p-4 rounded-lg border-2 transition-all touch-manipulation min-h-[100px] sm:min-h-[120px] ${kind === "request"
                                     ? "border-primary-500 bg-primary-50"
                                     : "border-gray-200 hover:border-gray-300 active:bg-gray-50"
@@ -141,7 +191,10 @@ export default function PublishPage() {
                         </button>
                         <button
                             type="button"
-                            onClick={() => setKind("trip")}
+                            onClick={() => {
+                                track("publish_kind_changed", { kind: "trip" });
+                                setKind("trip");
+                            }}
                             className={`p-3 sm:p-4 rounded-lg border-2 transition-all touch-manipulation min-h-[100px] sm:min-h-[120px] ${kind === "trip"
                                     ? "border-primary-500 bg-primary-50"
                                     : "border-gray-200 hover:border-gray-300 active:bg-gray-50"

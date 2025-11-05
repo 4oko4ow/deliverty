@@ -31,12 +31,22 @@ function PostHogPageView() {
 
 function Header() {
   const location = useLocation();
+  const posthog = usePostHog();
+
+  const trackNav = (destination: string) => {
+    if (posthog) {
+      posthog.capture("navigation_clicked", {
+        destination,
+        from: location.pathname,
+      });
+    }
+  };
 
   return (
     <header className="sticky top-0 z-50 bg-white/80 backdrop-blur-lg border-b border-gray-200 shadow-sm">
       <div className="max-w-4xl mx-auto px-4 py-4">
         <div className="flex items-center justify-between">
-          <Link to="/" className="flex items-center gap-2 group">
+          <Link to="/" onClick={() => trackNav("/")} className="flex items-center gap-2 group">
             <div className="p-2 bg-gradient-to-br from-primary-500 to-primary-600 rounded-lg shadow-lg group-hover:shadow-xl transition-shadow">
               <HiOutlinePaperAirplane className="w-5 h-5 text-white" />
             </div>
@@ -47,6 +57,7 @@ function Header() {
           <nav className="hidden sm:flex gap-1">
             <Link
               to="/"
+              onClick={() => trackNav("/")}
               className={`px-4 py-2 rounded-lg text-sm font-medium transition-all ${location.pathname === "/"
                 ? "bg-primary-50 text-primary-700"
                 : "text-gray-600 hover:text-gray-900 hover:bg-gray-50"
@@ -56,6 +67,7 @@ function Header() {
             </Link>
             <Link
               to="/publish"
+              onClick={() => trackNav("/publish")}
               className={`px-4 py-2 rounded-lg text-sm font-medium transition-all ${location.pathname === "/publish"
                 ? "bg-primary-50 text-primary-700"
                 : "text-gray-600 hover:text-gray-900 hover:bg-gray-50"
@@ -72,12 +84,23 @@ function Header() {
 
 function BottomNav() {
   const location = useLocation();
+  const posthog = usePostHog();
+
+  const trackNav = (destination: string) => {
+    if (posthog) {
+      posthog.capture("bottom_nav_clicked", {
+        destination,
+        from: location.pathname,
+      });
+    }
+  };
 
   return (
     <nav className="fixed bottom-0 left-0 right-0 z-50 bg-white/95 backdrop-blur-lg border-t border-gray-200 sm:hidden">
       <div className="flex items-center justify-around h-16">
         <Link
           to="/"
+          onClick={() => trackNav("/")}
           className={`flex flex-col items-center justify-center gap-1 px-4 py-2 rounded-lg transition-all ${location.pathname === "/"
             ? "text-primary-600"
             : "text-gray-500"
@@ -88,6 +111,7 @@ function BottomNav() {
         </Link>
         <Link
           to="/publish"
+          onClick={() => trackNav("/publish")}
           className={`flex flex-col items-center justify-center gap-1 px-4 py-2 rounded-lg transition-all ${location.pathname === "/publish"
             ? "text-primary-600"
             : "text-gray-500"

@@ -1,13 +1,16 @@
-import React, { useEffect, useState } from "react";
+import { useEffect, useState } from "react";
 import { api, isAuthenticated } from "../lib/api";
 import { useParams, useNavigate } from "react-router-dom";
 import { HiOutlineLocationMarker, HiOutlineCalendar, HiOutlineCube, HiOutlineArrowLeft, HiOutlineSparkles, HiOutlinePaperAirplane, HiOutlineExclamationCircle } from "react-icons/hi";
 import { HiOutlineGift, HiOutlineTruck, HiOutlineCheckCircle } from "react-icons/hi2";
+import UserRating from "../components/UserRating";
 import { formatItem, formatWeight } from "../lib/translations";
+import { usePostHogAnalytics } from "../lib/posthog";
 
 export default function MatchesPage() {
   const { pubId } = useParams();
   const navigate = useNavigate();
+  const { track } = usePostHogAnalytics();
   const [pub, setPub] = useState<any | null>(null);
   const [rows, setRows] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
@@ -29,6 +32,13 @@ export default function MatchesPage() {
         } else {
           setPub(pubData);
 
+          track("matches_page_viewed", {
+            pub_id: pubData.id,
+            pub_kind: pubData.kind,
+            from_iata: pubData.from_iata,
+            to_iata: pubData.to_iata,
+          });
+
           // If publication is "trip" (Лечу), show other trips instead of matches
           // This makes sense when user searched "Я ищу" and wants to see all available travelers
           if (pubData.kind === "trip") {
@@ -48,9 +58,17 @@ export default function MatchesPage() {
                     item: t.item,
                     weight: t.weight,
                     score: 50, // Default score for same route
+                    user_rating: t.user_rating || 0,
+                    username: t.username || "",
                   }));
                 setRows(otherTrips);
                 setLoading(false);
+
+                track("matches_loaded", {
+                  pub_id: pubData.id,
+                  pub_kind: pubData.kind,
+                  matches_count: otherTrips.length,
+                });
               } else {
                 setRows([]);
                 setLoading(false);
@@ -61,6 +79,12 @@ export default function MatchesPage() {
             api.matches(pubId!).then((matchesData) => {
               if (a && Array.isArray(matchesData)) {
                 setRows(matchesData);
+
+                track("matches_loaded", {
+                  pub_id: pubData.id,
+                  pub_kind: pubData.kind,
+                  matches_count: matchesData.length,
+                });
               } else {
                 setRows([]);
               }
@@ -86,6 +110,10 @@ export default function MatchesPage() {
     // Check authentication before creating deal
     if (!isAuthenticated()) {
       console.log("[FRONTEND] Not authenticated, redirecting");
+      track("deal_attempted_not_authenticated", {
+        pub_id: pubId,
+        other_pub_id: otherPubId,
+      });
       // Save current URL to return after auth
       const returnUrl = `/matches/${pubId}`;
       navigate(`/auth?return=${encodeURIComponent(returnUrl)}`);
@@ -94,6 +122,13 @@ export default function MatchesPage() {
 
     setCreating(otherPubId);
     setError(null);
+
+    track("deal_started_from_matches", {
+      pub_id: pubId,
+      other_pub_id: otherPubId,
+      other_kind: otherKind,
+    });
+
     try {
       const reqId = otherKind === "trip" ? Number(pubId) : otherPubId;
       const tripId = otherKind === "trip" ? otherPubId : Number(pubId);
@@ -106,6 +141,11 @@ export default function MatchesPage() {
         console.error("[FRONTEND] createDeal error", res.error);
         setError(res.error || "Ошибка при создании сделки");
         setCreating(null);
+        track("deal_error_from_matches", {
+          pub_id: pubId,
+          other_pub_id: otherPubId,
+          error: res.error,
+        });
       } else if (res.id) {
         console.log("[FRONTEND] Deal created, getting link for deal ID:", res.id);
         const link = await api.dealLink(res.id);
@@ -140,9 +180,22 @@ export default function MatchesPage() {
             console.error("[FRONTEND] Popup blocked by browser");
             setError("Браузер заблокировал открытие Telegram. Разрешите всплывающие окна или откройте ссылку вручную: " + link.url);
             setCreating(null);
+            track("deal_error_from_matches", {
+              pub_id: pubId,
+              other_pub_id: otherPubId,
+              error: "popup_blocked",
+            });
             return;
           }
           console.log("[FRONTEND] Telegram link opened successfully");
+
+          track("deal_created_from_matches", {
+            deal_id: res.id,
+            pub_id: pubId,
+            other_pub_id: otherPubId,
+            other_kind: otherKind,
+          });
+
           // Show success message briefly
           setTimeout(() => {
             setCreating(null);
@@ -151,16 +204,31 @@ export default function MatchesPage() {
           console.error("[FRONTEND] No URL in dealLink response", link);
           setError(link.error || "Не удалось получить ссылку на чат");
           setCreating(null);
+          track("deal_error_from_matches", {
+            pub_id: pubId,
+            other_pub_id: otherPubId,
+            error: "no_telegram_link",
+          });
         }
       } else {
         console.error("[FRONTEND] No deal ID in response", res);
         setError("Не удалось создать сделку");
         setCreating(null);
+        track("deal_error_from_matches", {
+          pub_id: pubId,
+          other_pub_id: otherPubId,
+          error: "no_deal_id",
+        });
       }
     } catch (err) {
       console.error("[FRONTEND] Exception in makeDeal", err);
       setError("Произошла ошибка. Попробуйте еще раз.");
       setCreating(null);
+      track("deal_error_from_matches", {
+        pub_id: pubId,
+        other_pub_id: otherPubId,
+        error: String(err),
+      });
     }
   }
 
@@ -182,7 +250,10 @@ export default function MatchesPage() {
   return (
     <div className="max-w-3xl mx-auto space-y-6 animate-fade-in">
       <button
-        onClick={() => navigate(-1)}
+        onClick={() => {
+          track("matches_back_clicked", { pub_id: pubId });
+          navigate(-1);
+        }}
         className="flex items-center gap-2 text-gray-600 hover:text-gray-900 active:text-gray-700 transition-colors touch-manipulation min-h-[48px]"
       >
         <HiOutlineArrowLeft className="w-5 h-5 sm:w-5 sm:h-5" />
@@ -278,6 +349,11 @@ export default function MatchesPage() {
                   </p>
                   <button
                     onClick={() => {
+                      track("matches_create_request_clicked", {
+                        pub_id: pub.id,
+                        from_iata: pub.from_iata,
+                        to_iata: pub.to_iata,
+                      });
                       navigate(`/publish?kind=request&from=${pub.from_iata}&to=${pub.to_iata}&date_start=${pub.date_start}&date_end=${pub.date_end}`);
                     }}
                     className="btn btn-primary w-full sm:w-auto"
@@ -362,7 +438,7 @@ export default function MatchesPage() {
                     style={{ animationDelay: `${idx * 50}ms` }}
                   >
                     <div className="flex flex-col sm:flex-row items-start sm:items-start justify-between gap-3 mb-4">
-                      <div className="flex items-center gap-2">
+                      <div className="flex items-center gap-2 flex-wrap">
                         {pub.kind === "request" ? (
                           // Если исходное объявление "Ищу", совпадения - это те, кто "Лечу"
                           <span className="badge-success">
@@ -376,6 +452,7 @@ export default function MatchesPage() {
                             <span className="text-xs sm:text-xs">Лечу, могу доставить</span>
                           </span>
                         )}
+                        <UserRating rating={r.user_rating || 0} username={r.username} />
                       </div>
                       <div className={`badge ${getScoreColor(r.score)} font-semibold`}>
                         <HiOutlineSparkles className="w-3 h-3 sm:w-3 sm:h-3" />
@@ -420,7 +497,16 @@ export default function MatchesPage() {
                     ) : (
                       <button
                         className="btn btn-primary w-full"
-                        onClick={() => makeDeal(r.other_pub_id, r.kind)}
+                        onClick={() => {
+                          track("match_clicked", {
+                            pub_id: pubId,
+                            match_pub_id: r.other_pub_id,
+                            match_kind: r.kind,
+                            match_score: r.score,
+                            match_index: idx,
+                          });
+                          makeDeal(r.other_pub_id, r.kind);
+                        }}
                         disabled={creating === r.other_pub_id}
                       >
                         {creating === r.other_pub_id ? (

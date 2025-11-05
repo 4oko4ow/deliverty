@@ -120,9 +120,11 @@ func listPublications(pool *pgxpool.Pool) gin.HandlerFunc {
 		kind := c.Query("kind") // optional
 
 		qry := `
-		  SELECT id, kind, from_iata, to_iata, date_start, date_end, item, weight, reward_hint, description
-		  FROM publication
-		  WHERE is_active AND from_iata=$1 AND to_iata=$2`
+		  SELECT p.id, p.kind, p.from_iata, p.to_iata, p.date_start, p.date_end, p.item, p.weight, p.reward_hint, p.description,
+		         COALESCE(u.rating_small, 0), COALESCE(u.tg_username, '')
+		  FROM publication p
+		  JOIN app_user u ON u.id = p.user_id
+		  WHERE p.is_active AND p.from_iata=$1 AND p.to_iata=$2`
 		args := []any{from, to}
 
 		if kind != "" {
@@ -150,6 +152,8 @@ func listPublications(pool *pgxpool.Pool) gin.HandlerFunc {
 			Weight      string `json:"weight"`
 			RewardHint  *int   `json:"reward_hint"`
 			Description string `json:"description"`
+			UserRating  int    `json:"user_rating"`
+			Username    string `json:"username"`
 		}
 
 		out := []Pub{}
@@ -157,7 +161,7 @@ func listPublications(pool *pgxpool.Pool) gin.HandlerFunc {
 		for rows.Next() {
 			var p Pub
 			var ds, de time.Time
-			if err := rows.Scan(&p.ID, &p.Kind, &p.From, &p.To, &ds, &de, &p.Item, &p.Weight, &p.RewardHint, &p.Description); err == nil {
+			if err := rows.Scan(&p.ID, &p.Kind, &p.From, &p.To, &ds, &de, &p.Item, &p.Weight, &p.RewardHint, &p.Description, &p.UserRating, &p.Username); err == nil {
 				p.DateStart = ds.Format("2006-01-02")
 				p.DateEnd = de.Format("2006-01-02")
 				out = append(out, p)
@@ -188,15 +192,19 @@ func getPublication(pool *pgxpool.Pool) gin.HandlerFunc {
 			Weight      string `json:"weight"`
 			RewardHint  *int   `json:"reward_hint"`
 			Description string `json:"description"`
+			UserRating  int    `json:"user_rating"`
+			Username    string `json:"username"`
 		}
 
 		var p Pub
 		var ds, de time.Time
 		err = pool.QueryRow(c, `
-			SELECT id, kind, from_iata, to_iata, date_start, date_end, item, weight, reward_hint, description
-			FROM publication
-			WHERE id=$1 AND is_active
-		`, id).Scan(&p.ID, &p.Kind, &p.From, &p.To, &ds, &de, &p.Item, &p.Weight, &p.RewardHint, &p.Description)
+			SELECT p.id, p.kind, p.from_iata, p.to_iata, p.date_start, p.date_end, p.item, p.weight, p.reward_hint, p.description,
+			       COALESCE(u.rating_small, 0), COALESCE(u.tg_username, '')
+			FROM publication p
+			JOIN app_user u ON u.id = p.user_id
+			WHERE p.id=$1 AND p.is_active
+		`, id).Scan(&p.ID, &p.Kind, &p.From, &p.To, &ds, &de, &p.Item, &p.Weight, &p.RewardHint, &p.Description, &p.UserRating, &p.Username)
 		if err != nil {
 			c.JSON(http.StatusNotFound, gin.H{"error": "publication not found"})
 			return

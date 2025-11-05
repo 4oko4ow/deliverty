@@ -2,6 +2,7 @@ import React, { useEffect, useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import TelegramLogin from "../components/TelegramLogin";
 import { HiOutlinePaperAirplane, HiOutlineCheckCircle, HiOutlineX } from "react-icons/hi";
+import { usePostHogAnalytics } from "../lib/posthog";
 
 const TG_BOT = import.meta.env.VITE_TG_BOT || "your_bot";
 const API_BASE = import.meta.env.VITE_API_BASE || "http://localhost:8080/api";
@@ -19,6 +20,7 @@ interface TelegramUser {
 export default function AuthPage() {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
+  const { track } = usePostHogAnalytics();
   const [showSuccess, setShowSuccess] = useState(false);
   const [showBotLink, setShowBotLink] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -32,6 +34,12 @@ export default function AuthPage() {
     if (authSuccess === "1" && userId) {
       // Save user ID to localStorage
       localStorage.setItem("tg_uid", userId);
+      
+      track("auth_success", {
+        user_id: userId,
+        return_url: searchParams.get("return") || "/",
+      });
+      
       // Show success notification
       setShowSuccess(true);
       setShowBotLink(true);
@@ -44,6 +52,7 @@ export default function AuthPage() {
       }, 5000);
     } else if (errorParam) {
       setError("Ошибка авторизации. Попробуйте еще раз.");
+      track("auth_error", { error: errorParam });
     }
   }, [searchParams, navigate]);
 
