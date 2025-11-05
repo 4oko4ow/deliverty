@@ -187,8 +187,8 @@ func listPublications(pool *pgxpool.Pool) gin.HandlerFunc {
 		qry += `
 		  ORDER BY 
 		    CASE 
-		      WHEN p.kind = 'trip' AND p.date IS NOT NULL THEN ABS(EXTRACT(EPOCH FROM (p.date - CURRENT_DATE)))
-		      WHEN p.kind = 'request' AND p.date_start IS NOT NULL THEN ABS(EXTRACT(EPOCH FROM (p.date_start - CURRENT_DATE)))
+		      WHEN p.kind = 'trip' AND p.date IS NOT NULL THEN ABS(EXTRACT(EPOCH FROM (p.date - CURRENT_DATE) * INTERVAL '1 day'))
+		      WHEN p.kind = 'request' AND p.date_start IS NOT NULL THEN ABS(EXTRACT(EPOCH FROM (p.date_start - CURRENT_DATE) * INTERVAL '1 day'))
 		      ELSE 999999999
 		    END ASC,
 		    p.created_at DESC
