@@ -1,6 +1,7 @@
 package httpx
 
 import (
+	"log"
 	"net/http"
 	"regexp"
 	"strconv"
@@ -123,19 +124,20 @@ func listPublications(pool *pgxpool.Pool) gin.HandlerFunc {
 		  SELECT p.id, p.kind, p.from_iata, p.to_iata, p.date_start, p.date_end, p.item, p.weight, p.reward_hint, p.description,
 		         COALESCE(u.rating_small, 0), COALESCE(u.tg_username, '')
 		  FROM publication p
-		  JOIN app_user u ON u.id = p.user_id
+		  LEFT JOIN app_user u ON u.id = p.user_id
 		  WHERE p.is_active AND p.from_iata=$1 AND p.to_iata=$2`
 		args := []any{from, to}
 
 		if kind != "" {
-			qry += " AND kind = $3::pub_type"
+			qry += " AND p.kind = $3::pub_type"
 			args = append(args, kind)
 		}
 
-		qry += " ORDER BY created_at DESC LIMIT 50"
+		qry += " ORDER BY p.created_at DESC LIMIT 50"
 
 		rows, err := pool.Query(c, qry, args...)
 		if err != nil {
+			log.Printf("[PUBLICATIONS] Database error: %v, query: %s, args: %v", err, qry, args)
 			c.JSON(http.StatusInternalServerError, gin.H{"error": "ошибка базы данных"})
 			return
 		}
@@ -161,11 +163,19 @@ func listPublications(pool *pgxpool.Pool) gin.HandlerFunc {
 		for rows.Next() {
 			var p Pub
 			var ds, de time.Time
-			if err := rows.Scan(&p.ID, &p.Kind, &p.From, &p.To, &ds, &de, &p.Item, &p.Weight, &p.RewardHint, &p.Description, &p.UserRating, &p.Username); err == nil {
-				p.DateStart = ds.Format("2006-01-02")
-				p.DateEnd = de.Format("2006-01-02")
-				out = append(out, p)
+			if err := rows.Scan(&p.ID, &p.Kind, &p.From, &p.To, &ds, &de, &p.Item, &p.Weight, &p.RewardHint, &p.Description, &p.UserRating, &p.Username); err != nil {
+				log.Printf("[PUBLICATIONS] Scan error: %v", err)
+				continue
 			}
+			p.DateStart = ds.Format("2006-01-02")
+			p.DateEnd = de.Format("2006-01-02")
+			out = append(out, p)
+		}
+
+		if err := rows.Err(); err != nil {
+			log.Printf("[PUBLICATIONS] Rows error: %v", err)
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "ошибка базы данных"})
+			return
 		}
 
 		c.JSON(http.StatusOK, out)
@@ -202,10 +212,11 @@ func getPublication(pool *pgxpool.Pool) gin.HandlerFunc {
 			SELECT p.id, p.kind, p.from_iata, p.to_iata, p.date_start, p.date_end, p.item, p.weight, p.reward_hint, p.description,
 			       COALESCE(u.rating_small, 0), COALESCE(u.tg_username, '')
 			FROM publication p
-			JOIN app_user u ON u.id = p.user_id
+			LEFT JOIN app_user u ON u.id = p.user_id
 			WHERE p.id=$1 AND p.is_active
 		`, id).Scan(&p.ID, &p.Kind, &p.From, &p.To, &ds, &de, &p.Item, &p.Weight, &p.RewardHint, &p.Description, &p.UserRating, &p.Username)
 		if err != nil {
+			log.Printf("[PUBLICATIONS] getPublication error: %v, id: %d", err, id)
 			c.JSON(http.StatusNotFound, gin.H{"error": "publication not found"})
 			return
 		}
