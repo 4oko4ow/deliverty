@@ -38,6 +38,11 @@ export default function BrowsePage() {
 
       const result: any = await api.listPubs(from, to, searchKind);
       if (Array.isArray(result)) {
+        // Debug: log first result to check description
+        if (result.length > 0) {
+          console.log("First result:", result[0]);
+          console.log("Description:", result[0].description);
+        }
         setRows(result);
         // Не загружаем совпадения на странице поиска - они будут показаны на странице детального просмотра
       } else if (result && typeof result === "object" && "error" in result) {
@@ -394,11 +399,17 @@ export default function BrowsePage() {
                       </div>
                     </div>
 
-                    {r.description && typeof r.description === "string" && r.description.trim().length > 0 && (
-                      <div className="mb-4 pt-3 border-t border-gray-100">
-                        <p className="text-sm text-gray-700 whitespace-pre-wrap line-clamp-3">{r.description}</p>
-                      </div>
-                    )}
+                    {(() => {
+                      const desc = r.description || r.desc || "";
+                      if (desc && String(desc).trim()) {
+                        return (
+                          <div className="mb-4 pt-3 border-t border-gray-100">
+                            <p className="text-sm text-gray-700 whitespace-pre-wrap line-clamp-3">{String(desc)}</p>
+                          </div>
+                        );
+                      }
+                      return null;
+                    })()}
 
                     <div className="flex items-center justify-end pt-4 border-t border-gray-100">
                       <button
