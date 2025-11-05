@@ -33,6 +33,7 @@ func RegisterRoutes(r *gin.Engine, pool *pgxpool.Pool) {
 		// Auth required routes
 		auth := api.Group("/")
 		auth.Use(WithUser(pool))
+		auth.GET("/profile", getUserProfile(pool))
 		auth.POST("/publications", RateLimit(20), createPublication(pool))
 		RegisterMatchAuthRoutes(auth, pool)
 		RegisterDealRoutes(auth, pool)

@@ -176,15 +176,20 @@ func createDeal(pool *pgxpool.Pool) gin.HandlerFunc {
 			}
 
 			var reqTG, tripTG int64
+			var reqRating, tripRating int
+			var reqUsername, tripUsername string
 			err := pool.QueryRow(ctx, `
-				SELECT ur.tg_user_id, ut.tg_user_id
+				SELECT 
+					ur.tg_user_id, ut.tg_user_id,
+					COALESCE(ur.rating_small, 0), COALESCE(ut.rating_small, 0),
+					COALESCE(ur.tg_username, ''), COALESCE(ut.tg_username, '')
 				FROM deal d
 				JOIN publication pr ON pr.id=d.request_pub_id
 				JOIN app_user ur ON ur.id=pr.user_id
 				JOIN publication pt ON pt.id=d.trip_pub_id
 				JOIN app_user ut ON ut.id=pt.user_id
 				WHERE d.id=$1
-			`, dealID).Scan(&reqTG, &tripTG)
+			`, dealID).Scan(&reqTG, &tripTG, &reqRating, &tripRating, &reqUsername, &tripUsername)
 
 			if err != nil {
 				log.Printf("[DEAL] Failed to get participants for deal %d: %v", dealID, err)
@@ -203,7 +208,12 @@ func createDeal(pool *pgxpool.Pool) gin.HandlerFunc {
 			encodedStart := url.QueryEscape(startParam)
 			link := fmt.Sprintf("https://t.me/%s?start=%s", botName, encodedStart)
 
-			msg := fmt.Sprintf("✅ Создана новая сделка!\n\nНажмите кнопку ниже, чтобы начать общение с другим участником.")
+			// Build counterpart info for each user
+			reqCounterpartInfo := buildProfileText(tripUsername, tripRating)
+			tripCounterpartInfo := buildProfileText(reqUsername, reqRating)
+
+			msgToReq := fmt.Sprintf("✅ Создана новая сделка!\n\n👤 Участник:\n%s\n\nНажмите кнопку ниже, чтобы начать общение.", reqCounterpartInfo)
+			msgToTrip := fmt.Sprintf("✅ Создана новая сделка!\n\n👤 Участник:\n%s\n\nНажмите кнопку ниже, чтобы начать общение.", tripCounterpartInfo)
 
 			// Create inline keyboard with button that triggers the /start command via callback
 			// Use callback_data to handle the button click
@@ -228,7 +238,7 @@ func createDeal(pool *pgxpool.Pool) gin.HandlerFunc {
 			if reqTG != 0 {
 				_, err := tg.API("sendMessage", gin.H{
 					"chat_id":      reqTG,
-					"text":         msg,
+					"text":         msgToReq,
 					"reply_markup": keyboard,
 				})
 				if err != nil {
@@ -241,7 +251,7 @@ func createDeal(pool *pgxpool.Pool) gin.HandlerFunc {
 			if tripTG != 0 && tripTG != reqTG {
 				_, err := tg.API("sendMessage", gin.H{
 					"chat_id":      tripTG,
-					"text":         msg,
+					"text":         msgToTrip,
 					"reply_markup": keyboard,
 				})
 				if err != nil {

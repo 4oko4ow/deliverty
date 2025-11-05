@@ -6,12 +6,40 @@ import (
 	"log"
 	"net/http"
 	"net/url"
+	"strconv"
 	"strings"
 
 	"github.com/gin-gonic/gin"
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/sol/deliverty/backend/internal/bot"
 )
+
+// buildProfileText builds a profile text with username and rating
+func buildProfileText(username string, rating int) string {
+	var namePart string
+	if username != "" {
+		namePart = fmt.Sprintf("👤 @%s\n", username)
+	} else {
+		namePart = "👤 Пользователь\n"
+	}
+	
+	stars := "⭐"
+	if rating > 0 {
+		starCount := rating
+		if starCount > 5 {
+			starCount = 5
+		}
+		stars = strings.Repeat("⭐", starCount) // Show max 5 stars visually
+		if rating > 5 {
+			stars += fmt.Sprintf(" (+%d)", rating-5)
+		}
+	} else {
+		stars = "⭐ (нет оценок)"
+	}
+	
+	return fmt.Sprintf("%s📊 Рейтинг: %s (%d)", namePart, stars, rating)
+}
+
 
 // Telegram Update (trimmed)
 type Update struct {
@@ -57,23 +85,147 @@ func registerBotRoutes(r *gin.Engine, pool *pgxpool.Pool) {
 		if up.CallbackQuery != nil {
 			log.Printf("[BOT] Received callback query from user %d: %q", up.CallbackQuery.From.ID, up.CallbackQuery.Data)
 			
-			// Answer callback to remove loading state
-			_, _ = tg.API("answerCallbackQuery", gin.H{
-				"callback_query_id": up.CallbackQuery.ID,
-			})
-
 			// Handle start_deal callback
 			if strings.HasPrefix(up.CallbackQuery.Data, "start_deal:") {
 				startParam := strings.TrimPrefix(up.CallbackQuery.Data, "start_deal:")
-				// Simulate /start command by processing the start parameter
-				text := fmt.Sprintf("/start %s", startParam)
-				log.Printf("[BOT] Processing callback as /start command: %q", text)
+				log.Printf("[BOT] Processing callback as /start command: %q", startParam)
 				
-			// Process the start command directly
-			processStartDeal(c.Request.Context(), pool, tg, up.CallbackQuery.From.ID, up.CallbackQuery.Message.Chat.ID, startParam)
+				// Answer callback to remove loading state
+				_, _ = tg.API("answerCallbackQuery", gin.H{
+					"callback_query_id": up.CallbackQuery.ID,
+				})
+				
+				// Process the start command directly
+				processStartDeal(c.Request.Context(), pool, tg, up.CallbackQuery.From.ID, up.CallbackQuery.Message.Chat.ID, startParam)
 				c.Status(http.StatusOK)
 				return
 			}
+
+			// Handle deal status callbacks
+			if strings.HasPrefix(up.CallbackQuery.Data, "deal_status:") {
+				parts := strings.SplitN(up.CallbackQuery.Data, ":", 2)
+				if len(parts) == 2 {
+					status := parts[1]
+					if status == "agreed" || status == "handoff_done" || status == "cancelled" {
+						// Answer callback first
+						_, _ = tg.API("answerCallbackQuery", gin.H{
+							"callback_query_id": up.CallbackQuery.ID,
+						})
+						
+						setStatus(c, pool, tg, up.CallbackQuery.From.ID, up.CallbackQuery.Message.Chat.ID, status)
+						
+						// Update message to show confirmation
+						statusText := map[string]string{
+							"agreed":      "✅ Согласовано",
+							"handoff_done": "✅ Передача завершена",
+							"cancelled":    "❌ Отменено",
+						}
+						
+						_, _ = tg.API("editMessageText", gin.H{
+							"chat_id":    up.CallbackQuery.Message.Chat.ID,
+							"message_id": up.CallbackQuery.Message.MessageID,
+							"text":       fmt.Sprintf("%s\n\nСтатус обновлен.", statusText[status]),
+						})
+						
+						// If status is handoff_done, show rating button
+						if status == "handoff_done" {
+							// Find the deal ID
+							var dealID int64
+							_ = pool.QueryRow(c, `
+								SELECT d.id FROM deal d
+								JOIN publication pr ON pr.id=d.request_pub_id
+								JOIN app_user ur ON ur.id=pr.user_id
+								JOIN publication pt ON pt.id=d.trip_pub_id
+								JOIN app_user ut ON ut.id=pt.user_id
+								WHERE (ur.tg_user_id=$1 OR ut.tg_user_id=$1) AND d.status='handoff_done'
+								ORDER BY d.last_message_at DESC LIMIT 1
+							`, up.CallbackQuery.From.ID).Scan(&dealID)
+							
+							if dealID > 0 {
+								// Check if already rated
+								var alreadyRated bool
+								_ = pool.QueryRow(c, `
+									SELECT EXISTS(SELECT 1 FROM rating_log WHERE deal_id=$1 AND rater_tg=$2)
+								`, dealID, up.CallbackQuery.From.ID).Scan(&alreadyRated)
+								
+								if !alreadyRated {
+									keyboard := gin.H{
+										"inline_keyboard": [][]gin.H{
+											{
+												{
+													"text":          "⭐ Оценить участника",
+													"callback_data": fmt.Sprintf("rate_deal:%d", dealID),
+												},
+											},
+										},
+									}
+									
+									_, _ = tg.API("sendMessage", gin.H{
+										"chat_id":      up.CallbackQuery.Message.Chat.ID,
+										"text":         "Пожалуйста, оцените участника сделки.",
+										"reply_markup": keyboard,
+									})
+								}
+							}
+						}
+						
+						c.Status(http.StatusOK)
+						return
+					}
+				}
+			}
+
+			// Handle rating callback
+			if strings.HasPrefix(up.CallbackQuery.Data, "rate_deal:") {
+				dealIDStr := strings.TrimPrefix(up.CallbackQuery.Data, "rate_deal:")
+				dealID, err := strconv.ParseInt(dealIDStr, 10, 64)
+				
+				if err == nil {
+					// Answer callback first
+					_, _ = tg.API("answerCallbackQuery", gin.H{
+						"callback_query_id": up.CallbackQuery.ID,
+						"text":             "Спасибо за оценку!",
+					})
+					
+					// Rate the deal (increment counterpart's rating)
+					uid := strconv.FormatInt(up.CallbackQuery.From.ID, 10)
+					_, _ = pool.Exec(c, `
+						WITH d AS (
+							SELECT d.id, ur.id AS req_user_id, ut.id AS trip_user_id,
+							       CASE WHEN ur.tg_user_id=$2::text::bigint THEN ut.id
+							            WHEN ut.tg_user_id=$2::text::bigint THEN ur.id END AS target_user_id
+							FROM deal d
+							JOIN publication pr ON pr.id=d.request_pub_id
+							JOIN app_user ur ON ur.id=pr.user_id
+							JOIN publication pt ON pt.id=d.trip_pub_id
+							JOIN app_user ut ON ut.id=pt.user_id
+							WHERE d.id=$1
+						), once AS (
+							INSERT INTO rating_log(deal_id, rater_tg, target_user_id)
+							SELECT d.id, $2::text::bigint, d.target_user_id FROM d
+							ON CONFLICT DO NOTHING RETURNING 1
+						)
+						UPDATE app_user u SET rating_small = rating_small + 1
+						WHERE u.id = (SELECT target_user_id FROM d)
+							AND EXISTS (SELECT 1 FROM once)
+					`, dealID, uid)
+					
+					// Update the button message to show it's been rated
+					_, _ = tg.API("editMessageText", gin.H{
+						"chat_id":    up.CallbackQuery.Message.Chat.ID,
+						"message_id": up.CallbackQuery.Message.MessageID,
+						"text":       "✅ Спасибо! Вы оценили участника сделки.",
+					})
+				}
+				
+				c.Status(http.StatusOK)
+				return
+			}
+
+			// Answer callback for any unhandled callbacks
+			_, _ = tg.API("answerCallbackQuery", gin.H{
+				"callback_query_id": up.CallbackQuery.ID,
+			})
 
 			c.Status(http.StatusOK)
 			return
@@ -95,14 +247,19 @@ func registerBotRoutes(r *gin.Engine, pool *pgxpool.Pool) {
 			if text == "/start connect" {
 				// Check if user exists in database
 				var exists bool
+				var rating int
+				var username string
 				_ = pool.QueryRow(c, `
-					SELECT EXISTS(SELECT 1 FROM app_user WHERE tg_user_id=$1)
-				`, up.Message.From.ID).Scan(&exists)
+					SELECT EXISTS(SELECT 1 FROM app_user WHERE tg_user_id=$1),
+					       COALESCE((SELECT rating_small FROM app_user WHERE tg_user_id=$1), 0),
+					       COALESCE((SELECT tg_username FROM app_user WHERE tg_user_id=$1), '')
+				`, up.Message.From.ID).Scan(&exists, &rating, &username)
 
 				if exists {
+					profileText := buildProfileText(username, rating)
 					_, _ = tg.API("sendMessage", gin.H{
 						"chat_id": up.Message.Chat.ID,
-						"text":    "✅ Отлично! Бот подключен. Теперь вы будете получать уведомления о совпадениях и сделках в Telegram.\n\nИспользуйте веб-сайт для поиска и создания объявлений, а здесь вы будете получать уведомления и можете общаться с другими участниками сделок.",
+						"text":    "✅ Отлично! Бот подключен. Теперь вы будете получать уведомления о совпадениях и сделках в Telegram.\n\n" + profileText + "\n\nИспользуйте веб-сайт для поиска и создания объявлений, а здесь вы будете получать уведомления и можете общаться с другими участниками сделок.",
 					})
 				} else {
 					_, _ = tg.API("sendMessage", gin.H{
@@ -122,23 +279,56 @@ func registerBotRoutes(r *gin.Engine, pool *pgxpool.Pool) {
 				return
 			}
 
-			// Plain /start - show welcome message
+			// Plain /start - show welcome message with profile
+			var rating int
+			var username string
+			_ = pool.QueryRow(c, `
+				SELECT COALESCE(rating_small, 0), COALESCE(tg_username, '')
+				FROM app_user WHERE tg_user_id=$1
+			`, up.Message.From.ID).Scan(&rating, &username)
+			
+			profileText := buildProfileText(username, rating)
 			_, _ = tg.API("sendMessage", gin.H{
 				"chat_id": up.Message.Chat.ID,
-				"text":    "Привет! Это бот Deliverty.\n\nИспользуйте веб-сайт для поиска и создания объявлений. Здесь вы будете получать уведомления о совпадениях и сделках.",
+				"text":    "Привет! Это бот Deliverty.\n\n" + profileText + "\n\nИспользуйте веб-сайт для поиска и создания объявлений. Здесь вы будете получать уведомления о совпадениях и сделках.\n\nКоманды:\n/profile - ваш профиль",
 			})
 			c.Status(http.StatusOK)
 			return
 		}
 
-		// Commands update deal status
+		// Handle /profile command
+		if text == "/profile" {
+			var rating int
+			var username string
+			err := pool.QueryRow(c, `
+				SELECT COALESCE(rating_small, 0), COALESCE(tg_username, '')
+				FROM app_user WHERE tg_user_id=$1
+			`, up.Message.From.ID).Scan(&rating, &username)
+			
+			if err != nil {
+				_, _ = tg.API("sendMessage", gin.H{
+					"chat_id": up.Message.Chat.ID,
+					"text":    "Вы не авторизованы. Пожалуйста, сначала авторизуйтесь на веб-сайте.",
+				})
+			} else {
+				profileText := buildProfileText(username, rating)
+				_, _ = tg.API("sendMessage", gin.H{
+					"chat_id": up.Message.Chat.ID,
+					"text":    "📊 Ваш профиль\n\n" + profileText,
+				})
+			}
+			c.Status(http.StatusOK)
+			return
+		}
+
+		// Commands update deal status (keep for backward compatibility, but prefer buttons)
 		switch text {
 		case "/agree":
-			setStatus(c, pool, up.Message.From.ID, "agreed")
+			setStatus(c, pool, tg, up.Message.From.ID, up.Message.Chat.ID, "agreed")
 		case "/done":
-			setStatus(c, pool, up.Message.From.ID, "handoff_done")
+			setStatus(c, pool, tg, up.Message.From.ID, up.Message.Chat.ID, "handoff_done")
 		case "/cancel":
-			setStatus(c, pool, up.Message.From.ID, "cancelled")
+			setStatus(c, pool, tg, up.Message.From.ID, up.Message.Chat.ID, "cancelled")
 		default:
 			relayMessage(c, pool, tg, up.Message.From.ID, text)
 		}
@@ -215,12 +405,63 @@ func processStartDeal(ctx context.Context, pool *pgxpool.Pool, tg *bot.TG, userI
 	}
 
 	log.Printf("[BOT] Successfully connected user %d to deal %s", userID, dealID)
-	_, _ = tg.API("sendMessage", gin.H{"chat_id": chatID, "text": "Подключено. Отправляйте сообщения сюда для пересылки.\nКоманды: /agree, /done, /cancel"})
+	
+	// Get counterpart info and rating
+	var counterpartRating int
+	var counterpartUsername string
+	var currentUserRating int
+	var currentUsername string
+	_ = pool.QueryRow(ctx, `
+		SELECT 
+			CASE WHEN ur.tg_user_id=$2 THEN ut.rating_small ELSE ur.rating_small END AS counterpart_rating,
+			CASE WHEN ur.tg_user_id=$2 THEN COALESCE(ut.tg_username, '') ELSE COALESCE(ur.tg_username, '') END AS counterpart_username,
+			CASE WHEN ur.tg_user_id=$2 THEN ur.rating_small ELSE ut.rating_small END AS current_rating,
+			CASE WHEN ur.tg_user_id=$2 THEN COALESCE(ur.tg_username, '') ELSE COALESCE(ut.tg_username, '') END AS current_username
+		FROM deal d
+		JOIN publication pr ON pr.id=d.request_pub_id
+		JOIN app_user ur ON ur.id=pr.user_id
+		JOIN publication pt ON pt.id=d.trip_pub_id
+		JOIN app_user ut ON ut.id=pt.user_id
+		WHERE d.id=$1
+	`, dealID, userID).Scan(&counterpartRating, &counterpartUsername, &currentUserRating, &currentUsername)
+	
+	counterpartInfo := buildProfileText(counterpartUsername, counterpartRating)
+	
+	// Create inline keyboard with status buttons
+	keyboard := gin.H{
+		"inline_keyboard": [][]gin.H{
+			{
+				{
+					"text":          "✅ Согласовать",
+					"callback_data": "deal_status:agreed",
+				},
+			},
+			{
+				{
+					"text":          "✅ Передача завершена",
+					"callback_data": "deal_status:handoff_done",
+				},
+			},
+			{
+				{
+					"text":          "❌ Отменить",
+					"callback_data": "deal_status:cancelled",
+				},
+			},
+		},
+	}
+	
+	text := fmt.Sprintf("✅ Подключено к сделке!\n\n👤 Участник:\n%s\n\nОтправляйте сообщения сюда для пересылки. Используйте кнопки ниже для управления сделкой.", counterpartInfo)
+	_, _ = tg.API("sendMessage", gin.H{
+		"chat_id":      chatID,
+		"text":         text,
+		"reply_markup": keyboard,
+	})
 }
 
-func setStatus(c *gin.Context, pool *pgxpool.Pool, fromTG int64, status string) {
+func setStatus(c *gin.Context, pool *pgxpool.Pool, tg *bot.TG, fromTG int64, chatID int64, status string) {
 	// Update only deals where sender participates; no message logs kept
-	_, _ = pool.Exec(c, `
+	rowsAffected, _ := pool.Exec(c, `
 	  UPDATE deal SET status=$1, last_message_at=now()
 	  WHERE id IN (
 	    SELECT d.id FROM deal d
@@ -230,6 +471,60 @@ func setStatus(c *gin.Context, pool *pgxpool.Pool, fromTG int64, status string) 
 	      JOIN app_user ut ON ut.id=pt.user_id
 	    WHERE ur.tg_user_id=$2 OR ut.tg_user_id=$2
 	  )`, status, fromTG)
+	
+	// If called from command (not callback), send confirmation
+	if tg != nil && rowsAffected.RowsAffected() > 0 {
+		statusText := map[string]string{
+			"agreed":      "✅ Согласовано",
+			"handoff_done": "✅ Передача завершена",
+			"cancelled":    "❌ Отменено",
+		}
+		
+		_, _ = tg.API("sendMessage", gin.H{
+			"chat_id": chatID,
+			"text":    fmt.Sprintf("%s\n\nСтатус обновлен.", statusText[status]),
+		})
+		
+		// If status is handoff_done, show rating button
+		if status == "handoff_done" {
+			var dealID int64
+			_ = pool.QueryRow(c, `
+				SELECT d.id FROM deal d
+				JOIN publication pr ON pr.id=d.request_pub_id
+				JOIN app_user ur ON ur.id=pr.user_id
+				JOIN publication pt ON pt.id=d.trip_pub_id
+				JOIN app_user ut ON ut.id=pt.user_id
+				WHERE (ur.tg_user_id=$1 OR ut.tg_user_id=$1) AND d.status='handoff_done'
+				ORDER BY d.last_message_at DESC LIMIT 1
+			`, fromTG).Scan(&dealID)
+			
+			if dealID > 0 {
+				var alreadyRated bool
+				_ = pool.QueryRow(c, `
+					SELECT EXISTS(SELECT 1 FROM rating_log WHERE deal_id=$1 AND rater_tg=$2)
+				`, dealID, fromTG).Scan(&alreadyRated)
+				
+				if !alreadyRated {
+					keyboard := gin.H{
+						"inline_keyboard": [][]gin.H{
+							{
+								{
+									"text":          "⭐ Оценить участника",
+									"callback_data": fmt.Sprintf("rate_deal:%d", dealID),
+								},
+							},
+						},
+					}
+					
+					_, _ = tg.API("sendMessage", gin.H{
+						"chat_id":      chatID,
+						"text":         "Пожалуйста, оцените участника сделки.",
+						"reply_markup": keyboard,
+					})
+				}
+			}
+		}
+	}
 }
 
 func relayMessage(c *gin.Context, pool *pgxpool.Pool, tg *bot.TG, fromTG int64, text string) {
