@@ -2,7 +2,7 @@ import React, { useEffect, useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import TelegramLogin from "../components/TelegramLogin";
 import { HiOutlinePaperAirplane, HiOutlineCheckCircle, HiOutlineX } from "react-icons/hi";
-import { usePostHogAnalytics } from "../lib/posthog";
+import { usePostHog } from "posthog-js/react";
 
 const TG_BOT = import.meta.env.VITE_TG_BOT || "your_bot";
 const API_BASE = import.meta.env.VITE_API_BASE || "http://localhost:8080/api";
@@ -20,18 +20,38 @@ interface TelegramUser {
 export default function AuthPage() {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
-  const { track } = usePostHogAnalytics();
+  const posthog = usePostHog();
   const [showSuccess, setShowSuccess] = useState(false);
   const [showBotLink, setShowBotLink] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
+  // Helper function to track events
+  const track = (eventName: string, properties?: Record<string, any>) => {
+    if (posthog) {
+      posthog.capture(eventName, properties);
+      if (import.meta.env.DEV) {
+        console.log(`[PostHog] Tracked: ${eventName}`, properties);
+      }
+    } else if (import.meta.env.DEV) {
+      console.warn(`[PostHog] Skipped: ${eventName} (PostHog not ready)`, properties);
+    }
+  };
+
   // Track page view
   useEffect(() => {
-    track("auth_page_viewed", {
-      return_url: searchParams.get("return") || null,
-    });
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []); // Only on mount
+    if (posthog) {
+      posthog.capture("auth_page_viewed", {
+        return_url: searchParams.get("return") || null,
+      });
+      if (import.meta.env.DEV) {
+        console.log("[PostHog] Tracked: auth_page_viewed", {
+          return_url: searchParams.get("return") || null,
+        });
+      }
+    } else if (import.meta.env.DEV) {
+      console.warn("[PostHog] Skipped: auth_page_viewed (PostHog not ready)");
+    }
+  }, [posthog, searchParams]); // Track when PostHog is ready and searchParams change
 
   // Check if we're returning from Telegram auth (redirect mode fallback)
   useEffect(() => {
@@ -62,7 +82,8 @@ export default function AuthPage() {
       setError("Ошибка авторизации. Попробуйте еще раз.");
       track("auth_error", { error: errorParam });
     }
-  }, [searchParams, navigate]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [searchParams, navigate]); // track function is stable, posthog is checked inside
 
   // Check if already authenticated
   useEffect(() => {

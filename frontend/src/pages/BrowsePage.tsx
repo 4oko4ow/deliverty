@@ -7,11 +7,11 @@ import { HiOutlineSearch, HiOutlineLocationMarker, HiOutlineCalendar, HiOutlineC
 import { HiOutlineTruck, HiOutlineGift } from "react-icons/hi2";
 import { FaTelegram } from "react-icons/fa";
 import { formatItem, formatWeight } from "../lib/translations";
-import { usePostHogAnalytics } from "../lib/posthog";
+import { usePostHog } from "posthog-js/react";
 
 export default function BrowsePage() {
   const navigate = useNavigate();
-  const { track } = usePostHogAnalytics();
+  const posthog = usePostHog();
   const [from, setFrom] = useState("");
   const [to, setTo] = useState("");
   const [kindFilter, setKindFilter] = useState<"request" | "trip">("request");
@@ -22,11 +22,24 @@ export default function BrowsePage() {
   const [creating, setCreating] = useState<number | null>(null);
   const [telegramLink, setTelegramLink] = useState<string | null>(null);
 
+  // Helper function to track events
+  const track = (eventName: string, properties?: Record<string, any>) => {
+    if (posthog) {
+      posthog.capture(eventName, properties);
+      if (import.meta.env.DEV) {
+        console.log(`[PostHog] Tracked: ${eventName}`, properties);
+      }
+    } else if (import.meta.env.DEV) {
+      console.warn(`[PostHog] Skipped: ${eventName} (PostHog not ready)`, properties);
+    }
+  };
+
   // Track page view
   useEffect(() => {
-    track("browse_page_viewed");
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []); // Only on mount - track is stable
+    if (posthog) {
+      posthog.capture("browse_page_viewed");
+    }
+  }, [posthog]); // Track when PostHog is ready
 
   // Restore search state after login
   useEffect(() => {

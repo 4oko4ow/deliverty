@@ -11,15 +11,22 @@ import {
 } from "react-icons/hi";
 import { HiOutlineGift, HiOutlineTruck } from "react-icons/hi2";
 import { formatItem, formatWeight } from "../lib/translations";
-import { usePostHogAnalytics } from "../lib/posthog";
+import { usePostHog } from "posthog-js/react";
 
 export default function ProfilePage() {
   const navigate = useNavigate();
-  const { track } = usePostHogAnalytics();
+  const posthog = usePostHog();
   const [publications, setPublications] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [updating, setUpdating] = useState<Set<number>>(new Set());
+
+  // Helper function to track events
+  const track = (eventName: string, properties?: Record<string, any>) => {
+    if (posthog) {
+      posthog.capture(eventName, properties);
+    }
+  };
 
   useEffect(() => {
     if (!isAuthenticated()) {

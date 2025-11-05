@@ -4,11 +4,11 @@ import { api, isAuthenticated } from "../lib/api";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { HiOutlineCalendar, HiOutlineCube, HiOutlineExclamationCircle } from "react-icons/hi";
 import { HiOutlineSparkles, HiOutlineGift, HiOutlineTruck } from "react-icons/hi2";
-import { usePostHogAnalytics } from "../lib/posthog";
+import { usePostHog } from "posthog-js/react";
 
 export default function PublishPage() {
     const [searchParams] = useSearchParams();
-    const { track } = usePostHogAnalytics();
+    const posthog = usePostHog();
     const [kind, setKind] = useState<"request" | "trip">("request");
     const [from, setFrom] = useState("");
     const [to, setTo] = useState("");
@@ -21,16 +21,24 @@ export default function PublishPage() {
     const [error, setError] = useState<string | null>(null);
     const nav = useNavigate();
 
+    // Helper function to track events
+    const track = (eventName: string, properties?: Record<string, any>) => {
+        if (posthog) {
+            posthog.capture(eventName, properties);
+        }
+    };
+
     // Track page view
     useEffect(() => {
-        const urlKind = searchParams.get("kind");
-        track("publish_page_viewed", {
-            kind: urlKind || null,
-            from_url_param: searchParams.get("from") || null,
-            to_url_param: searchParams.get("to") || null,
-        });
-        // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, []); // Only on mount - track and searchParams are stable
+        if (posthog) {
+            const urlKind = searchParams.get("kind");
+            posthog.capture("publish_page_viewed", {
+                kind: urlKind || null,
+                from_url_param: searchParams.get("from") || null,
+                to_url_param: searchParams.get("to") || null,
+            });
+        }
+    }, [posthog, searchParams]); // Track when PostHog is ready and searchParams change
 
     // Pre-fill form from URL parameters or restored state
     useEffect(() => {
