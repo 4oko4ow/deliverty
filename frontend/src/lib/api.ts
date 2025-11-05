@@ -70,6 +70,31 @@ export const api = {
     return handleResponse(response);
   },
 
+  listMyPubs: async (from?: string, to?: string, kind?: string) => {
+    const params = new URLSearchParams();
+    if (from) params.append("from", from);
+    if (to) params.append("to", to);
+    if (kind) params.append("kind", kind);
+    const response = await fetch(
+      `${BASE}/publications/mine?${params.toString()}`,
+      { headers: tgHeader() }
+    );
+    return handleResponse(response);
+  },
+
+  updatePub: async (id: number, isActive?: boolean) => {
+    const body: any = {};
+    if (isActive !== undefined) {
+      body.is_active = isActive;
+    }
+    const response = await fetch(`${BASE}/publications/${id}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json", ...tgHeader() },
+      body: JSON.stringify(body),
+    });
+    return handleResponse(response);
+  },
+
   getPub: async (id: string) => {
     const response = await fetch(`${BASE}/publications/${id}`);
     return handleResponse(response);

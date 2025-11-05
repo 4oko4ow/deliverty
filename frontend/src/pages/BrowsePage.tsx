@@ -110,438 +110,478 @@ export default function BrowsePage() {
       // If user searches "Я ищу" (request), they see "trip" results
       // To create deal, we need user's request publication
       if (kindFilter === "request") {
-        // Try to find user's own request first
-        const myRequests: any = await api.listPubs(resultPub.from_iata, resultPub.to_iata, "request");
+        // Try to find user's own request first on this route
+        let myRequests: any = await api.listMyPubs(resultPub.from_iata, resultPub.to_iata, "request");
 
         let myRequestId: number;
 
         if (Array.isArray(myRequests) && myRequests.length > 0) {
-          // User has own request, use it
+          // User has own request on this route, use it
           myRequestId = myRequests[0].id;
         } else {
-          // No own request found, create minimal one automatically
-          const newPub: any = await api.createPub({
-            kind: "request",
-            from_iata: resultPub.from_iata,
-            to_iata: resultPub.to_iata,
-            date_start: resultPub.date_start,
-            date_end: resultPub.date_end,
-            item: resultPub.item || "documents",
-            weight: resultPub.weight || "envelope",
-            description: ""
-          });
+          // Try to find any request publication by user (maybe on different route)
+          const allMyRequests: any = await api.listMyPubs(undefined, undefined, "request");
+          if (Array.isArray(allMyRequests) && allMyRequests.length > 0) {
+            // Use any existing request publication
+            myRequestId = allMyRequests[0].id;
+          } else {
+            // No own request found, create minimal one automatically
+            const newPub: any = await api.createPub({
+              kind: "request",
+              from_iata: resultPub.from_iata,
+              to_iata: resultPub.to_iata,
+              date_start: resultPub.date_start,
+              date_end: resultPub.date_end,
+              item: resultPub.item || "documents",
+              weight: resultPub.weight || "envelope",
+              description: ""
+            });
 
-          if (newPub.error || !newPub.id) {
-            setError(newPub.error || "Не удалось создать объявление");
+            if (newPub.error || !newPub.id) {
+              // Check if error is about publication limit
+              if (newPub.error && newPub.error.includes("лимит 5 активных публикаций")) {
+                // Load all user publications to show them
+                const allMyPubs: any = await api.listMyPubs();
+                if (Array.isArray(allMyPubs) && allMyPubs.length > 0) {
+                  const pubsList = allMyPubs.map((p: any) =>
+                    `${p.from_iata} → ${p.to_iata} (${p.kind === "request" ? "Ищу" : "Лечу"})`
+                  ).join(", ");
+                  setError(`У вас уже 5 активных публикаций: ${pubsList}. Пожалуйста, деактивируйте одну из них, чтобы создать новую.`);
+                } else {
+                  setError("У вас уже 5 активных публикаций. Пожалуйста, деактивируйте одну из существующих публикаций.");
+                }
+              } else {
+                setError(newPub.error || "Не удалось создать объявление");
+              }
+              setCreating(null);
+              track("deal_error", {
+                pub_id: resultPub.id,
+                error: "failed_to_create_publication",
+                user_filter_kind: kindFilter,
+              });
+              return;
+            }
+
+            myRequestId = newPub.id;
+          }
+
+          // Create deal with automatically created or existing request
+          const res = await api.createDeal(myRequestId, resultPub.id);
+
+          if (res.error) {
+            setError(res.error || "Не удалось создать сделку");
             setCreating(null);
             track("deal_error", {
               pub_id: resultPub.id,
-              error: "failed_to_create_publication",
+              error: res.error,
               user_filter_kind: kindFilter,
             });
             return;
           }
 
-          myRequestId = newPub.id;
+          if (res.id) {
+            // Get Telegram link and open it
+            const link = await api.dealLink(res.id);
+            if (link.url) {
+              const isMobile = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
+              let telegramUrl = link.url;
+
+              if (isMobile) {
+                const urlObj = new URL(link.url);
+                const startParam = urlObj.searchParams.get('start');
+                if (startParam) {
+                  telegramUrl = `tg://resolve?domain=${link.url.split('t.me/')[1].split('?')[0]}&start=${startParam}`;
+                }
+              }
+
+              window.open(telegramUrl, "_blank");
+              setCreating(null);
+
+              track("deal_created", {
+                deal_id: res.id,
+                pub_id: resultPub.id,
+                pub_kind: resultPub.kind,
+                from_iata: resultPub.from_iata,
+                to_iata: resultPub.to_iata,
+                user_filter_kind: kindFilter,
+              });
+
+              // Show success message briefly
+              setTimeout(() => {
+                setError(null);
+              }, 2000);
+              return;
+            } else {
+              setError(link.error || "Не удалось получить ссылку на чат");
+              setCreating(null);
+              track("deal_error", {
+                pub_id: resultPub.id,
+                error: "no_telegram_link",
+                user_filter_kind: kindFilter,
+              });
+              return;
+            }
+          }
         }
 
-        // Create deal with automatically created or existing request
-        const res = await api.createDeal(myRequestId, resultPub.id);
+        // If user searches "Я лечу" (trip), they see "request" results
+        // To create deal, we need user's trip publication
+        if (kindFilter === "trip") {
+          // Try to find user's own trip first on this route
+          let myTrips: any = await api.listMyPubs(resultPub.from_iata, resultPub.to_iata, "trip");
 
-        if (res.error) {
-          setError(res.error || "Не удалось создать сделку");
+          let myTripId: number;
+
+          if (Array.isArray(myTrips) && myTrips.length > 0) {
+            // User has own trip on this route, use it
+            myTripId = myTrips[0].id;
+          } else {
+            // Try to find any trip publication by user (maybe on different route)
+            const allMyTrips: any = await api.listMyPubs(undefined, undefined, "trip");
+            if (Array.isArray(allMyTrips) && allMyTrips.length > 0) {
+              // Use any existing trip publication
+              myTripId = allMyTrips[0].id;
+            } else {
+              // No own trip found, create minimal one automatically
+              const newPub: any = await api.createPub({
+                kind: "trip",
+                from_iata: resultPub.from_iata,
+                to_iata: resultPub.to_iata,
+                date_start: resultPub.date_start,
+                date_end: resultPub.date_end,
+                item: resultPub.item || "documents",
+                weight: resultPub.weight || "envelope",
+                description: ""
+              });
+
+              if (newPub.error || !newPub.id) {
+                // Check if error is about publication limit
+                if (newPub.error && newPub.error.includes("лимит 5 активных публикаций")) {
+                  // Load all user publications to show them
+                  const allMyPubs: any = await api.listMyPubs();
+                  if (Array.isArray(allMyPubs) && allMyPubs.length > 0) {
+                    const pubsList = allMyPubs.map((p: any) =>
+                      `${p.from_iata} → ${p.to_iata} (${p.kind === "request" ? "Ищу" : "Лечу"})`
+                    ).join(", ");
+                    setError(`У вас уже 5 активных публикаций: ${pubsList}. Пожалуйста, деактивируйте одну из них, чтобы создать новую.`);
+                  } else {
+                    setError("У вас уже 5 активных публикаций. Пожалуйста, деактивируйте одну из существующих публикаций.");
+                  }
+                } else {
+                  setError(newPub.error || "Не удалось создать объявление");
+                }
+                setCreating(null);
+                return;
+              }
+
+              myTripId = newPub.id;
+            }
+
+            // Create deal with automatically created or existing trip
+            const res = await api.createDeal(resultPub.id, myTripId);
+
+            if (res.error) {
+              setError(res.error || "Не удалось создать сделку");
+              setCreating(null);
+              return;
+            }
+
+            if (res.id) {
+              // Get Telegram link and open it
+              const link = await api.dealLink(res.id);
+              if (link.url) {
+                const isMobile = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
+                let telegramUrl = link.url;
+
+                if (isMobile) {
+                  const urlObj = new URL(link.url);
+                  const startParam = urlObj.searchParams.get('start');
+                  if (startParam) {
+                    telegramUrl = `tg://resolve?domain=${link.url.split('t.me/')[1].split('?')[0]}&start=${startParam}`;
+                  }
+                }
+
+                window.open(telegramUrl, "_blank");
+                setCreating(null);
+
+                track("deal_created", {
+                  deal_id: res.id,
+                  pub_id: resultPub.id,
+                  pub_kind: resultPub.kind,
+                  from_iata: resultPub.from_iata,
+                  to_iata: resultPub.to_iata,
+                  user_filter_kind: kindFilter,
+                });
+
+                // Show success message briefly
+                setTimeout(() => {
+                  setError(null);
+                }, 2000);
+                return;
+              } else {
+                setError(link.error || "Не удалось получить ссылку на чат");
+                setCreating(null);
+                track("deal_error", {
+                  pub_id: resultPub.id,
+                  error: "no_telegram_link",
+                  user_filter_kind: kindFilter,
+                });
+                return;
+              }
+            }
+          }
+        } catch (err) {
+          console.error("[BrowsePage] makeDeal error", err);
+          setError("Произошла ошибка. Попробуйте еще раз.");
           setCreating(null);
           track("deal_error", {
             pub_id: resultPub.id,
-            error: res.error,
+            error: String(err),
             user_filter_kind: kindFilter,
           });
-          return;
-        }
-
-        if (res.id) {
-          // Get Telegram link and open it
-          const link = await api.dealLink(res.id);
-          if (link.url) {
-            const isMobile = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
-            let telegramUrl = link.url;
-
-            if (isMobile) {
-              const urlObj = new URL(link.url);
-              const startParam = urlObj.searchParams.get('start');
-              if (startParam) {
-                telegramUrl = `tg://resolve?domain=${link.url.split('t.me/')[1].split('?')[0]}&start=${startParam}`;
-              }
-            }
-
-            window.open(telegramUrl, "_blank");
-            setCreating(null);
-
-            track("deal_created", {
-              deal_id: res.id,
-              pub_id: resultPub.id,
-              pub_kind: resultPub.kind,
-              from_iata: resultPub.from_iata,
-              to_iata: resultPub.to_iata,
-              user_filter_kind: kindFilter,
-            });
-
-            // Show success message briefly
-            setTimeout(() => {
-              setError(null);
-            }, 2000);
-            return;
-          } else {
-            setError(link.error || "Не удалось получить ссылку на чат");
-            setCreating(null);
-            track("deal_error", {
-              pub_id: resultPub.id,
-              error: "no_telegram_link",
-              user_filter_kind: kindFilter,
-            });
-            return;
-          }
         }
       }
 
-      // If user searches "Я лечу" (trip), they see "request" results
-      // To create deal, we need user's trip publication
-      if (kindFilter === "trip") {
-        // Try to find user's own trip first
-        const myTrips: any = await api.listPubs(resultPub.from_iata, resultPub.to_iata, "trip");
 
-        let myTripId: number;
+      const formatDate = (dateStr: string) => {
+        if (!dateStr) return "";
+        const date = new Date(dateStr);
+        return date.toLocaleDateString("ru-RU", { month: "short", day: "numeric", year: "numeric" });
+      };
 
-        if (Array.isArray(myTrips) && myTrips.length > 0) {
-          // User has own trip, use it
-          myTripId = myTrips[0].id;
-        } else {
-          // No own trip found, create minimal one automatically
-          const newPub: any = await api.createPub({
-            kind: "trip",
-            from_iata: resultPub.from_iata,
-            to_iata: resultPub.to_iata,
-            date_start: resultPub.date_start,
-            date_end: resultPub.date_end,
-            item: resultPub.item || "documents",
-            weight: resultPub.weight || "envelope",
-            description: ""
-          });
-
-          if (newPub.error || !newPub.id) {
-            setError(newPub.error || "Не удалось создать объявление");
-            setCreating(null);
-            return;
-          }
-
-          myTripId = newPub.id;
-        }
-
-        // Create deal with automatically created or existing trip
-        const res = await api.createDeal(resultPub.id, myTripId);
-
-        if (res.error) {
-          setError(res.error || "Не удалось создать сделку");
-          setCreating(null);
-          return;
-        }
-
-        if (res.id) {
-          // Get Telegram link and open it
-          const link = await api.dealLink(res.id);
-          if (link.url) {
-            const isMobile = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
-            let telegramUrl = link.url;
-
-            if (isMobile) {
-              const urlObj = new URL(link.url);
-              const startParam = urlObj.searchParams.get('start');
-              if (startParam) {
-                telegramUrl = `tg://resolve?domain=${link.url.split('t.me/')[1].split('?')[0]}&start=${startParam}`;
-              }
-            }
-
-            window.open(telegramUrl, "_blank");
-            setCreating(null);
-
-            track("deal_created", {
-              deal_id: res.id,
-              pub_id: resultPub.id,
-              pub_kind: resultPub.kind,
-              from_iata: resultPub.from_iata,
-              to_iata: resultPub.to_iata,
-              user_filter_kind: kindFilter,
-            });
-
-            // Show success message briefly
-            setTimeout(() => {
-              setError(null);
-            }, 2000);
-            return;
-          } else {
-            setError(link.error || "Не удалось получить ссылку на чат");
-            setCreating(null);
-            track("deal_error", {
-              pub_id: resultPub.id,
-              error: "no_telegram_link",
-              user_filter_kind: kindFilter,
-            });
-            return;
-          }
-        }
-      }
-    } catch (err) {
-      console.error("[BrowsePage] makeDeal error", err);
-      setError("Произошла ошибка. Попробуйте еще раз.");
-      setCreating(null);
-      track("deal_error", {
-        pub_id: resultPub.id,
-        error: String(err),
-        user_filter_kind: kindFilter,
-      });
-    }
-  }
-
-
-  const formatDate = (dateStr: string) => {
-    if (!dateStr) return "";
-    const date = new Date(dateStr);
-    return date.toLocaleDateString("ru-RU", { month: "short", day: "numeric", year: "numeric" });
-  };
-
-  return (
-    <div className="space-y-6 animate-fade-in">
-      <div className="text-center space-y-2">
-        <h1 className="text-2xl sm:text-3xl font-bold text-gray-900">Найдите подходящий вариант</h1>
-        <p className="text-sm sm:text-base text-gray-600">Поиск объявлений по маршруту</p>
-      </div>
-
-      <div className="card p-4 sm:p-6 space-y-4">
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-          <AirportInput label="Откуда" value={from} onChange={setFrom} />
-          <AirportInput label="Куда" value={to} onChange={setTo} />
-        </div>
-
-        {/* Filter by kind */}
-        <div>
-          <label className="block text-sm sm:text-sm font-medium text-gray-700 mb-2">
-            Я
-          </label>
-          <div className="grid grid-cols-2 gap-2">
-            <button
-              type="button"
-              onClick={() => {
-                track("filter_changed", { filter: "request", from_iata: from, to_iata: to });
-                setKindFilter("request");
-              }}
-              className={`px-3 py-3 sm:px-4 sm:py-3 rounded-lg border-2 transition-all text-sm sm:text-base flex items-center justify-center gap-2 touch-manipulation min-h-[56px] ${kindFilter === "request"
-                ? "border-primary-500 bg-primary-50 text-primary-900 font-semibold"
-                : "border-gray-200 hover:border-gray-300 active:bg-gray-50 text-gray-700"
-                }`}
-            >
-              <HiOutlineGift className="w-5 h-5 sm:w-5 sm:h-5 flex-shrink-0" />
-              <span>ищу</span>
-            </button>
-            <button
-              type="button"
-              onClick={() => {
-                track("filter_changed", { filter: "trip", from_iata: from, to_iata: to });
-                setKindFilter("trip");
-              }}
-              className={`px-3 py-3 sm:px-4 sm:py-3 rounded-lg border-2 transition-all text-sm sm:text-base flex items-center justify-center gap-2 touch-manipulation min-h-[56px] ${kindFilter === "trip"
-                ? "border-primary-500 bg-primary-50 text-primary-900 font-semibold"
-                : "border-gray-200 hover:border-gray-300 active:bg-gray-50 text-gray-700"
-                }`}
-            >
-              <HiOutlineTruck className="w-5 h-5 sm:w-5 sm:h-5 flex-shrink-0" />
-              <span>лечу</span>
-            </button>
+      return (
+        <div className="space-y-6 animate-fade-in">
+          <div className="text-center space-y-2">
+            <h1 className="text-2xl sm:text-3xl font-bold text-gray-900">Найдите подходящий вариант</h1>
+            <p className="text-sm sm:text-base text-gray-600">Поиск объявлений по маршруту</p>
           </div>
-          <p className="text-xs text-gray-500 mt-2 text-center">
-            {kindFilter === "request"
-              ? "Найду путешественников, которые летят по вашему маршруту"
-              : "Найду запросы на доставку по вашему маршруту"}
-          </p>
-        </div>
 
-        <button
-          className="btn btn-primary w-full"
-          onClick={search}
-          disabled={loading || !from || !to}
-        >
-          {loading ? (
-            <>
-              <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
-              Поиск...
-            </>
-          ) : (
-            <>
-              <HiOutlineSearch className="w-5 h-5" />
-              Найти
-            </>
-          )}
-        </button>
-
-        {error && (
-          <div className="flex items-start gap-2 p-4 bg-red-50 border border-red-200 rounded-lg">
-            <HiOutlineExclamationCircle className="w-5 h-5 text-red-600 flex-shrink-0 mt-0.5" />
-            <p className="text-sm text-red-700">{error}</p>
-          </div>
-        )}
-      </div>
-
-      {searched && (
-        <div className="space-y-3">
-          {loading ? (
-            <div className="card p-12 text-center">
-              <div className="w-12 h-12 border-4 border-primary-200 border-t-primary-600 rounded-full animate-spin mx-auto mb-4" />
-              <p className="text-gray-600">Поиск совпадений...</p>
+          <div className="card p-4 sm:p-6 space-y-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <AirportInput label="Откуда" value={from} onChange={setFrom} />
+              <AirportInput label="Куда" value={to} onChange={setTo} />
             </div>
-          ) : rows.length === 0 ? (
-            <div className="card p-6 sm:p-12 text-center">
-              <HiOutlineSearch className="w-12 h-12 sm:w-16 sm:h-16 text-gray-300 mx-auto mb-4" />
-              <h3 className="text-base sm:text-lg font-semibold text-gray-900 mb-2">Результаты не найдены</h3>
-              <p className="text-sm sm:text-base text-gray-600 mb-4">
-                {kindFilter === "trip"
-                  ? "Пока нет запросов на доставку по этому маршруту. Создайте свое объявление или попробуйте изменить критерии поиска."
-                  : "Пока нет путешественников по этому маршруту. Создайте свое объявление или попробуйте изменить критерии поиска."}
+
+            {/* Filter by kind */}
+            <div>
+              <label className="block text-sm sm:text-sm font-medium text-gray-700 mb-2">
+                Я
+              </label>
+              <div className="grid grid-cols-2 gap-2">
+                <button
+                  type="button"
+                  onClick={() => {
+                    track("filter_changed", { filter: "request", from_iata: from, to_iata: to });
+                    setKindFilter("request");
+                  }}
+                  className={`px-3 py-3 sm:px-4 sm:py-3 rounded-lg border-2 transition-all text-sm sm:text-base flex items-center justify-center gap-2 touch-manipulation min-h-[56px] ${kindFilter === "request"
+                    ? "border-primary-500 bg-primary-50 text-primary-900 font-semibold"
+                    : "border-gray-200 hover:border-gray-300 active:bg-gray-50 text-gray-700"
+                    }`}
+                >
+                  <HiOutlineGift className="w-5 h-5 sm:w-5 sm:h-5 flex-shrink-0" />
+                  <span>ищу</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    track("filter_changed", { filter: "trip", from_iata: from, to_iata: to });
+                    setKindFilter("trip");
+                  }}
+                  className={`px-3 py-3 sm:px-4 sm:py-3 rounded-lg border-2 transition-all text-sm sm:text-base flex items-center justify-center gap-2 touch-manipulation min-h-[56px] ${kindFilter === "trip"
+                    ? "border-primary-500 bg-primary-50 text-primary-900 font-semibold"
+                    : "border-gray-200 hover:border-gray-300 active:bg-gray-50 text-gray-700"
+                    }`}
+                >
+                  <HiOutlineTruck className="w-5 h-5 sm:w-5 sm:h-5 flex-shrink-0" />
+                  <span>лечу</span>
+                </button>
+              </div>
+              <p className="text-xs text-gray-500 mt-2 text-center">
+                {kindFilter === "request"
+                  ? "Найду путешественников, которые летят по вашему маршруту"
+                  : "Найду запросы на доставку по вашему маршруту"}
               </p>
-              <div className="flex flex-col sm:flex-row gap-3 justify-center">
-                <button
-                  onClick={() => {
-                    track("search_cleared", { from_iata: from, to_iata: to, kind_filter: kindFilter });
-                    setFrom("");
-                    setTo("");
-                    setSearched(false);
-                    setRows([]);
-                  }}
-                  className="btn btn-secondary"
-                >
-                  Очистить поиск
-                </button>
-                <button
-                  onClick={() => {
-                    track("navigate_to_publish", {
-                      from_search: true,
-                      kind: kindFilter === "request" ? "request" : "trip",
-                      from_iata: from,
-                      to_iata: to,
-                    });
-                    navigate(`/publish?kind=${kindFilter === "request" ? "request" : "trip"}&from=${from}&to=${to}`);
-                  }}
-                  className="btn btn-primary"
-                >
-                  Создать объявление
-                </button>
-              </div>
             </div>
-          ) : (
-            <>
-              <div className="flex items-center justify-between">
-                <h2 className="text-lg sm:text-xl font-semibold text-gray-900">
-                  {rows.length} {rows.length === 1 ? "результат" : rows.length < 5 ? "результата" : "результатов"}
-                </h2>
+
+            <button
+              className="btn btn-primary w-full"
+              onClick={search}
+              disabled={loading || !from || !to}
+            >
+              {loading ? (
+                <>
+                  <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                  Поиск...
+                </>
+              ) : (
+                <>
+                  <HiOutlineSearch className="w-5 h-5" />
+                  Найти
+                </>
+              )}
+            </button>
+
+            {error && (
+              <div className="flex items-start gap-2 p-4 bg-red-50 border border-red-200 rounded-lg">
+                <HiOutlineExclamationCircle className="w-5 h-5 text-red-600 flex-shrink-0 mt-0.5" />
+                <p className="text-sm text-red-700">{error}</p>
               </div>
-              <div className="grid gap-4">
-                {rows.map((r, idx) => (
-                  <div
-                    key={r.id}
-                    className="card-hover p-4 sm:p-5 animate-slide-up touch-manipulation"
-                    style={{ animationDelay: `${idx * 50}ms` }}
-                  >
-                    <div className="flex items-start justify-between mb-3">
-                      <div className="flex items-center gap-2 flex-wrap">
-                        {r.kind === "request" ? (
-                          <span className="badge-primary">
-                            <HiOutlineGift className="w-3 h-3 sm:w-3 sm:h-3" />
-                            <span className="text-xs sm:text-xs">Ищу кто летит</span>
-                          </span>
-                        ) : (
-                          <span className="badge-success">
-                            <HiOutlineTruck className="w-3 h-3 sm:w-3 sm:h-3" />
-                            <span className="text-xs sm:text-xs">Лечу</span>
-                          </span>
-                        )}
-                        <UserRating rating={r.user_rating || 0} />
-                      </div>
-                    </div>
+            )}
+          </div>
 
-                    <div className="flex items-center gap-2 sm:gap-3 mb-4">
-                      <div className="flex items-center gap-1.5 sm:gap-2">
-                        <div className="p-1.5 bg-primary-50 rounded-lg">
-                          <HiOutlineLocationMarker className="w-4 h-4 sm:w-4 sm:h-4 text-primary-600" />
-                        </div>
-                        <span className="font-semibold text-gray-900 text-sm sm:text-base">{r.from_iata}</span>
-                      </div>
-                      <HiArrowRight className="w-4 h-4 sm:w-5 sm:h-5 text-gray-400 flex-shrink-0" />
-                      <div className="flex items-center gap-1.5 sm:gap-2">
-                        <div className="p-1.5 bg-primary-50 rounded-lg">
-                          <HiOutlineLocationMarker className="w-4 h-4 sm:w-4 sm:h-4 text-primary-600" />
-                        </div>
-                        <span className="font-semibold text-gray-900 text-sm sm:text-base">{r.to_iata}</span>
-                      </div>
-                    </div>
-
-                    <div className="flex flex-col sm:flex-row sm:flex-wrap items-start sm:items-center gap-2 sm:gap-4 text-xs sm:text-sm text-gray-600 mb-4">
-                      <div className="flex items-center gap-1.5">
-                        <HiOutlineCalendar className="w-4 h-4 sm:w-4 sm:h-4 flex-shrink-0" />
-                        <span className="break-words">{formatDate(r.date_start)} – {formatDate(r.date_end)}</span>
-                      </div>
-                      <div className="flex items-center gap-1.5">
-                        <HiOutlineCube className="w-4 h-4 sm:w-4 sm:h-4 flex-shrink-0" />
-                        <span>{formatItem(r.item)}</span>
-                        <span className="text-gray-400">•</span>
-                        <span>{formatWeight(r.weight)}</span>
-                      </div>
-                    </div>
-
-                    {(() => {
-                      const desc = r.description || r.desc || "";
-                      if (desc && String(desc).trim()) {
-                        return (
-                          <div className="mb-4 pt-3 border-t border-gray-100">
-                            <p className="text-sm text-gray-700 whitespace-pre-wrap line-clamp-3">{String(desc)}</p>
-                          </div>
-                        );
-                      }
-                      return null;
-                    })()}
-
-                    <div className="flex items-center justify-end pt-4 border-t border-gray-100">
-                      <button
-                        className="btn btn-primary text-xs sm:text-sm px-4 py-2"
-                        onClick={() => {
-                          track("result_clicked", {
-                            pub_id: r.id,
-                            pub_kind: r.kind,
-                            from_iata: r.from_iata,
-                            to_iata: r.to_iata,
-                            user_filter_kind: kindFilter,
-                            result_index: idx,
-                          });
-                          makeDeal(r);
-                        }}
-                        disabled={creating === r.id}
-                      >
-                        {creating === r.id ? (
-                          <>
-                            <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
-                            Подождите...
-                          </>
-                        ) : (
-                          <>
-                            Открыть чат в Telegram
-                          </>
-                        )}
-                      </button>
-                    </div>
+          {searched && (
+            <div className="space-y-3">
+              {loading ? (
+                <div className="card p-12 text-center">
+                  <div className="w-12 h-12 border-4 border-primary-200 border-t-primary-600 rounded-full animate-spin mx-auto mb-4" />
+                  <p className="text-gray-600">Поиск совпадений...</p>
+                </div>
+              ) : rows.length === 0 ? (
+                <div className="card p-6 sm:p-12 text-center">
+                  <HiOutlineSearch className="w-12 h-12 sm:w-16 sm:h-16 text-gray-300 mx-auto mb-4" />
+                  <h3 className="text-base sm:text-lg font-semibold text-gray-900 mb-2">Результаты не найдены</h3>
+                  <p className="text-sm sm:text-base text-gray-600 mb-4">
+                    {kindFilter === "trip"
+                      ? "Пока нет запросов на доставку по этому маршруту. Создайте свое объявление или попробуйте изменить критерии поиска."
+                      : "Пока нет путешественников по этому маршруту. Создайте свое объявление или попробуйте изменить критерии поиска."}
+                  </p>
+                  <div className="flex flex-col sm:flex-row gap-3 justify-center">
+                    <button
+                      onClick={() => {
+                        track("search_cleared", { from_iata: from, to_iata: to, kind_filter: kindFilter });
+                        setFrom("");
+                        setTo("");
+                        setSearched(false);
+                        setRows([]);
+                      }}
+                      className="btn btn-secondary"
+                    >
+                      Очистить поиск
+                    </button>
+                    <button
+                      onClick={() => {
+                        track("navigate_to_publish", {
+                          from_search: true,
+                          kind: kindFilter === "request" ? "request" : "trip",
+                          from_iata: from,
+                          to_iata: to,
+                        });
+                        navigate(`/publish?kind=${kindFilter === "request" ? "request" : "trip"}&from=${from}&to=${to}`);
+                      }}
+                      className="btn btn-primary"
+                    >
+                      Создать объявление
+                    </button>
                   </div>
-                ))}
-              </div>
-            </>
+                </div>
+              ) : (
+                <>
+                  <div className="flex items-center justify-between">
+                    <h2 className="text-lg sm:text-xl font-semibold text-gray-900">
+                      {rows.length} {rows.length === 1 ? "результат" : rows.length < 5 ? "результата" : "результатов"}
+                    </h2>
+                  </div>
+                  <div className="grid gap-4">
+                    {rows.map((r, idx) => (
+                      <div
+                        key={r.id}
+                        className="card-hover p-4 sm:p-5 animate-slide-up touch-manipulation"
+                        style={{ animationDelay: `${idx * 50}ms` }}
+                      >
+                        <div className="flex items-start justify-between mb-3">
+                          <div className="flex items-center gap-2 flex-wrap">
+                            {r.kind === "request" ? (
+                              <span className="badge-primary">
+                                <HiOutlineGift className="w-3 h-3 sm:w-3 sm:h-3" />
+                                <span className="text-xs sm:text-xs">Ищу кто летит</span>
+                              </span>
+                            ) : (
+                              <span className="badge-success">
+                                <HiOutlineTruck className="w-3 h-3 sm:w-3 sm:h-3" />
+                                <span className="text-xs sm:text-xs">Лечу</span>
+                              </span>
+                            )}
+                            <UserRating rating={r.user_rating || 0} />
+                          </div>
+                        </div>
+
+                        <div className="flex items-center gap-2 sm:gap-3 mb-4">
+                          <div className="flex items-center gap-1.5 sm:gap-2">
+                            <div className="p-1.5 bg-primary-50 rounded-lg">
+                              <HiOutlineLocationMarker className="w-4 h-4 sm:w-4 sm:h-4 text-primary-600" />
+                            </div>
+                            <span className="font-semibold text-gray-900 text-sm sm:text-base">{r.from_iata}</span>
+                          </div>
+                          <HiArrowRight className="w-4 h-4 sm:w-5 sm:h-5 text-gray-400 flex-shrink-0" />
+                          <div className="flex items-center gap-1.5 sm:gap-2">
+                            <div className="p-1.5 bg-primary-50 rounded-lg">
+                              <HiOutlineLocationMarker className="w-4 h-4 sm:w-4 sm:h-4 text-primary-600" />
+                            </div>
+                            <span className="font-semibold text-gray-900 text-sm sm:text-base">{r.to_iata}</span>
+                          </div>
+                        </div>
+
+                        <div className="flex flex-col sm:flex-row sm:flex-wrap items-start sm:items-center gap-2 sm:gap-4 text-xs sm:text-sm text-gray-600 mb-4">
+                          <div className="flex items-center gap-1.5">
+                            <HiOutlineCalendar className="w-4 h-4 sm:w-4 sm:h-4 flex-shrink-0" />
+                            <span className="break-words">{formatDate(r.date_start)} – {formatDate(r.date_end)}</span>
+                          </div>
+                          <div className="flex items-center gap-1.5">
+                            <HiOutlineCube className="w-4 h-4 sm:w-4 sm:h-4 flex-shrink-0" />
+                            <span>{formatItem(r.item)}</span>
+                            <span className="text-gray-400">•</span>
+                            <span>{formatWeight(r.weight)}</span>
+                          </div>
+                        </div>
+
+                        {(() => {
+                          const desc = r.description || r.desc || "";
+                          if (desc && String(desc).trim()) {
+                            return (
+                              <div className="mb-4 pt-3 border-t border-gray-100">
+                                <p className="text-sm text-gray-700 whitespace-pre-wrap line-clamp-3">{String(desc)}</p>
+                              </div>
+                            );
+                          }
+                          return null;
+                        })()}
+
+                        <div className="flex items-center justify-end pt-4 border-t border-gray-100">
+                          <button
+                            className="btn btn-primary text-xs sm:text-sm px-4 py-2"
+                            onClick={() => {
+                              track("result_clicked", {
+                                pub_id: r.id,
+                                pub_kind: r.kind,
+                                from_iata: r.from_iata,
+                                to_iata: r.to_iata,
+                                user_filter_kind: kindFilter,
+                                result_index: idx,
+                              });
+                              makeDeal(r);
+                            }}
+                            disabled={creating === r.id}
+                          >
+                            {creating === r.id ? (
+                              <>
+                                <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                                Подождите...
+                              </>
+                            ) : (
+                              <>
+                                Открыть чат в Telegram
+                              </>
+                            )}
+                          </button>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </>
+              )}
+            </div>
           )}
         </div>
-      )}
-    </div>
-  );
-}
+      );
+    }

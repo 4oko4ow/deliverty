@@ -1,6 +1,7 @@
 package httpx
 
 import (
+	"fmt"
 	"log"
 	"net/http"
 	"regexp"
@@ -32,6 +33,12 @@ func RegisterPublicationRoutes(g *gin.RouterGroup, pool *pgxpool.Pool) {
 	g.POST("/publications", RateLimit(20), createPublication(pool))
 	g.GET("/publications", listPublications(pool))
 	g.GET("/publications/:id", getPublication(pool))
+}
+
+// RegisterPublicationAuthRoutes registers auth-required publication routes
+func RegisterPublicationAuthRoutes(g *gin.RouterGroup, pool *pgxpool.Pool) {
+	g.GET("/publications/mine", listMyPublications(pool))
+	g.PATCH("/publications/:id", updatePublication(pool))
 }
 
 func createPublication(pool *pgxpool.Pool) gin.HandlerFunc {
@@ -224,6 +231,141 @@ func getPublication(pool *pgxpool.Pool) gin.HandlerFunc {
 		p.DateStart = ds.Format("2006-01-02")
 		p.DateEnd = de.Format("2006-01-02")
 		c.JSON(http.StatusOK, p)
+	}
+}
+
+func listMyPublications(pool *pgxpool.Pool) gin.HandlerFunc {
+	return func(c *gin.Context) {
+		// Get user ID from context (set by WithUser middleware)
+		userID, exists := c.Get(CtxDBUserID)
+		if !exists {
+			c.JSON(http.StatusUnauthorized, gin.H{"error": "not authenticated"})
+			return
+		}
+		uid := userID.(int64)
+
+		from := c.Query("from")
+		to := c.Query("to")
+		kind := c.Query("kind") // optional
+
+		qry := `
+		  SELECT p.id, p.kind, p.from_iata, p.to_iata, p.date_start, p.date_end, p.item, p.weight, p.reward_hint, p.description,
+		         COALESCE(u.rating_small, 0), COALESCE(u.tg_username, '')
+		  FROM publication p
+		  LEFT JOIN app_user u ON u.id = p.user_id
+		  WHERE p.is_active AND p.user_id=$1`
+		args := []any{uid}
+
+		if from != "" && to != "" {
+			qry += " AND p.from_iata=$2 AND p.to_iata=$3"
+			args = append(args, from, to)
+		}
+
+		if kind != "" {
+			idx := len(args) + 1
+			qry += fmt.Sprintf(" AND p.kind = $%d::pub_type", idx)
+			args = append(args, kind)
+		}
+
+		qry += " ORDER BY p.created_at DESC LIMIT 50"
+
+		rows, err := pool.Query(c, qry, args...)
+		if err != nil {
+			log.Printf("[PUBLICATIONS] Database error: %v, query: %s, args: %v", err, qry, args)
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "ошибка базы данных"})
+			return
+		}
+		defer rows.Close()
+
+		type Pub struct {
+			ID          int64  `json:"id"`
+			Kind        string `json:"kind"`
+			From        string `json:"from_iata"`
+			To          string `json:"to_iata"`
+			DateStart   string `json:"date_start"`
+			DateEnd     string `json:"date_end"`
+			Item        string `json:"item"`
+			Weight      string `json:"weight"`
+			RewardHint  *int   `json:"reward_hint"`
+			Description string `json:"description"`
+			UserRating  int    `json:"user_rating"`
+			Username    string `json:"username"`
+		}
+
+		out := []Pub{}
+
+		for rows.Next() {
+			var p Pub
+			var ds, de time.Time
+			if err := rows.Scan(&p.ID, &p.Kind, &p.From, &p.To, &ds, &de, &p.Item, &p.Weight, &p.RewardHint, &p.Description, &p.UserRating, &p.Username); err != nil {
+				log.Printf("[PUBLICATIONS] Scan error: %v", err)
+				continue
+			}
+			p.DateStart = ds.Format("2006-01-02")
+			p.DateEnd = de.Format("2006-01-02")
+			out = append(out, p)
+		}
+
+		if err := rows.Err(); err != nil {
+			log.Printf("[PUBLICATIONS] Rows error: %v", err)
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "ошибка базы данных"})
+			return
+		}
+
+		c.JSON(http.StatusOK, out)
+	}
+}
+
+type UpdatePubIn struct {
+	IsActive *bool `json:"is_active"` // optional, if provided updates is_active
+}
+
+func updatePublication(pool *pgxpool.Pool) gin.HandlerFunc {
+	return func(c *gin.Context) {
+		// Get user ID from context
+		userID, exists := c.Get(CtxDBUserID)
+		if !exists {
+			c.JSON(http.StatusUnauthorized, gin.H{"error": "not authenticated"})
+			return
+		}
+		uid := userID.(int64)
+
+		idStr := c.Param("id")
+		pubID, err := strconv.ParseInt(idStr, 10, 64)
+		if err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "invalid id"})
+			return
+		}
+
+		// Verify publication belongs to user
+		var ownerID int64
+		err = pool.QueryRow(c, `SELECT user_id FROM publication WHERE id=$1`, pubID).Scan(&ownerID)
+		if err != nil {
+			c.JSON(http.StatusNotFound, gin.H{"error": "publication not found"})
+			return
+		}
+		if ownerID != uid {
+			c.JSON(http.StatusForbidden, gin.H{"error": "not your publication"})
+			return
+		}
+
+		var in UpdatePubIn
+		if err := c.ShouldBindJSON(&in); err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "bad json"})
+			return
+		}
+
+		// Update is_active if provided
+		if in.IsActive != nil {
+			_, err = pool.Exec(c, `UPDATE publication SET is_active=$1 WHERE id=$2`, *in.IsActive, pubID)
+			if err != nil {
+				log.Printf("[PUBLICATIONS] Update error: %v", err)
+				c.JSON(http.StatusInternalServerError, gin.H{"error": "ошибка обновления"})
+				return
+			}
+		}
+
+		c.JSON(http.StatusOK, gin.H{"ok": true})
 	}
 }
 

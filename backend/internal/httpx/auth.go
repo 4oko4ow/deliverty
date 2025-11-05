@@ -1,7 +1,10 @@
 package httpx
 
 import (
+	"encoding/json"
 	"fmt"
+	"io"
+	"log"
 	"net/http"
 	"os"
 	"strings"
@@ -106,21 +109,63 @@ func handleTelegramAuth(pool *pgxpool.Pool) gin.HandlerFunc {
 		go func() {
 			tg := bot.New()
 			if tg.Token == "" {
+				log.Printf("[AUTH] Cannot send notification: TG_BOT_TOKEN not set")
 				return
 			}
 
 			// Try to send a welcome message
-			// This will fail silently if user hasn't started conversation with bot
 			welcomeMsg := "✅ Авторизация успешна! Вы вошли в систему Deliverty."
 			if firstName != "" {
 				welcomeMsg = fmt.Sprintf("✅ Привет, %s! Авторизация успешна. Вы вошли в систему Deliverty.", firstName)
 			}
 
 			// Use Bot API to send message (will only work if user started conversation)
-			_, _ = tg.API("sendMessage", map[string]any{
+			resp, err := tg.API("sendMessage", map[string]any{
 				"chat_id": userID,
 				"text":    welcomeMsg,
 			})
+
+			if err != nil {
+				log.Printf("[AUTH] Failed to send notification to user %d: %v", userID, err)
+				return
+			}
+			defer resp.Body.Close()
+
+			// Read response to check for errors
+			body, err := io.ReadAll(resp.Body)
+			if err != nil {
+				log.Printf("[AUTH] Failed to read Telegram API response for user %d: %v", userID, err)
+				return
+			}
+
+			// Parse Telegram API response
+			var apiResp struct {
+				OK          bool            `json:"ok"`
+				Result      json.RawMessage `json:"result,omitempty"`
+				ErrorCode   int             `json:"error_code,omitempty"`
+				Description string          `json:"description,omitempty"`
+			}
+
+			if err := json.Unmarshal(body, &apiResp); err != nil {
+				log.Printf("[AUTH] Failed to parse Telegram API response for user %d: %v (body: %s)", userID, err, string(body))
+				return
+			}
+
+			if !apiResp.OK {
+				// Common errors:
+				// - 403: Forbidden (user blocked bot or hasn't started conversation)
+				// - 400: Bad Request (invalid chat_id, etc.)
+				log.Printf("[AUTH] Telegram API error for user %d: code=%d, description=%s",
+					userID, apiResp.ErrorCode, apiResp.Description)
+
+				// Log specific error for debugging
+				if apiResp.ErrorCode == 403 {
+					log.Printf("[AUTH] User %d hasn't started conversation with bot or blocked the bot", userID)
+				}
+				return
+			}
+
+			log.Printf("[AUTH] Successfully sent login notification to user %d", userID)
 		}()
 
 		// Return JSON for callback mode, redirect for redirect mode

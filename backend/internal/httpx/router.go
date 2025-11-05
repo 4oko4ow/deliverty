@@ -35,6 +35,7 @@ func RegisterRoutes(r *gin.Engine, pool *pgxpool.Pool) {
 		auth.Use(WithUser(pool))
 		auth.GET("/profile", getUserProfile(pool))
 		auth.POST("/publications", RateLimit(20), createPublication(pool))
+		RegisterPublicationAuthRoutes(auth, pool)
 		RegisterMatchAuthRoutes(auth, pool)
 		RegisterDealRoutes(auth, pool)
 	}
