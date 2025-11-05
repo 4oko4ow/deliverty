@@ -221,7 +221,11 @@ export default function ProfilePage() {
                 <div className="flex items-center gap-1.5">
                   <HiOutlineCalendar className="w-4 h-4 flex-shrink-0" />
                   <span className="break-words">
-                    {formatDate(pub.date_start)} – {formatDate(pub.date_end)}
+                    {pub.kind === "trip" && pub.date
+                      ? formatDate(pub.date)
+                      : pub.date_start && pub.date_end
+                        ? `${formatDate(pub.date_start)} – ${formatDate(pub.date_end)}`
+                        : ""}
                   </span>
                 </div>
                 <div className="flex items-center gap-1.5">
