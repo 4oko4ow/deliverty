@@ -18,6 +18,14 @@ export default function AirportInput({
   const wrapperRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
+    // Don't search if value is already set and q matches the selected format (IATA — Name)
+    // This prevents searching after selection
+    if (value && q.includes(" — ")) {
+      setOpts([]);
+      setShowDropdown(false);
+      return;
+    }
+    
     if (q.length < 2) {
       setOpts([]);
       setShowDropdown(false);
@@ -27,8 +35,14 @@ export default function AirportInput({
     let a = true;
     api.airports(q).then((x) => {
       if (a) {
-        setOpts(x);
+        setOpts(Array.isArray(x) ? x : []);
         setShowDropdown(true);
+        setLoading(false);
+      }
+    }).catch(() => {
+      if (a) {
+        setOpts([]);
+        setShowDropdown(false);
         setLoading(false);
       }
     });
@@ -36,7 +50,7 @@ export default function AirportInput({
       a = false;
       setLoading(false);
     };
-  }, [q]);
+  }, [q, value]);
 
   useEffect(() => {
     function handleClickOutside(event: MouseEvent) {
@@ -50,8 +64,10 @@ export default function AirportInput({
 
   const handleSelect = (iata: string, name: string) => {
     onChange(iata);
+    // Set the display text but don't trigger search again
     setQ(`${iata} — ${name}`);
     setShowDropdown(false);
+    setOpts([]); // Clear options to prevent showing dropdown again
   };
 
   const clearSelection = () => {
@@ -71,8 +87,19 @@ export default function AirportInput({
         </div>
         <input
           value={q}
-          onChange={(e) => setQ(e.target.value)}
-          onFocus={() => q.length >= 2 && opts.length > 0 && setShowDropdown(true)}
+          onChange={(e) => {
+            setQ(e.target.value);
+            // If user starts typing, clear the value to allow new search
+            if (value && !e.target.value.includes(" — ")) {
+              onChange("");
+            }
+          }}
+          onFocus={() => {
+            // Only show dropdown if we have search results and not already selected
+            if (q.length >= 2 && opts.length > 0 && !q.includes(" — ")) {
+              setShowDropdown(true);
+            }
+          }}
           placeholder="Начните вводить название или код аэропорта"
           className="input pl-10 sm:pl-10 pr-10 sm:pr-10"
         />
