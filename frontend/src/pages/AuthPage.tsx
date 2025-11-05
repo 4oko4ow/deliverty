@@ -25,6 +25,14 @@ export default function AuthPage() {
   const [showBotLink, setShowBotLink] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
+  // Track page view
+  useEffect(() => {
+    track("auth_page_viewed", {
+      return_url: searchParams.get("return") || null,
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []); // Only on mount
+
   // Check if we're returning from Telegram auth (redirect mode fallback)
   useEffect(() => {
     const authSuccess = searchParams.get("auth_success");
@@ -124,6 +132,11 @@ export default function AuthPage() {
                       target="_blank"
                       rel="noopener noreferrer"
                       className="inline-flex items-center gap-2 px-3 py-1.5 text-xs font-medium text-white bg-green-600 hover:bg-green-700 rounded-lg transition-colors"
+                      onClick={() => {
+                        track("telegram_bot_link_clicked", {
+                          source: "auth_success",
+                        });
+                      }}
                     >
                       Открыть бота в Telegram
                     </a>

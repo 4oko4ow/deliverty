@@ -22,6 +22,12 @@ export default function BrowsePage() {
   const [creating, setCreating] = useState<number | null>(null);
   const [telegramLink, setTelegramLink] = useState<string | null>(null);
 
+  // Track page view
+  useEffect(() => {
+    track("browse_page_viewed");
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []); // Only on mount - track is stable
+
   // Restore search state after login
   useEffect(() => {
     const savedState = localStorage.getItem("browse_search_state");
@@ -71,6 +77,16 @@ export default function BrowsePage() {
                   kind_filter: restoredKindFilter,
                   results_count: result.length,
                 });
+
+                // Track when results are displayed
+                if (result.length > 0) {
+                  track("search_results_viewed", {
+                    from_iata: restoredFrom,
+                    to_iata: restoredTo,
+                    kind_filter: restoredKindFilter,
+                    results_count: result.length,
+                  });
+                }
               } else if (result && typeof result === "object" && "error" in result) {
                 setError(result.error || "Ошибка при поиске");
                 setRows([]);
@@ -144,6 +160,16 @@ export default function BrowsePage() {
           kind_filter: kindFilter,
           results_count: result.length,
         });
+
+        // Track when results are displayed
+        if (result.length > 0) {
+          track("search_results_viewed", {
+            from_iata: from,
+            to_iata: to,
+            kind_filter: kindFilter,
+            results_count: result.length,
+          });
+        }
 
         // Не загружаем совпадения на странице поиска - они будут показаны на странице детального просмотра
       } else if (result && typeof result === "object" && "error" in result) {
@@ -687,7 +713,7 @@ export default function BrowsePage() {
                               let contactsMsg = "✅ Контакты создателя объявления:\n\n";
                               const username = result.username;
                               let link = "";
-                              
+
                               if (username && typeof username === 'string' && username.trim()) {
                                 contactsMsg += `Telegram: @${username}`;
                                 link = `https://t.me/${username}`;
@@ -704,7 +730,7 @@ export default function BrowsePage() {
                               const originalLink = telegramLink;
                               setError(contactsMsg);
                               setTelegramLink(link || null);
-                              
+
                               setTimeout(() => {
                                 setError(originalError);
                                 setTelegramLink(originalLink);

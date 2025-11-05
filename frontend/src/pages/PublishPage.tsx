@@ -21,6 +21,17 @@ export default function PublishPage() {
     const [error, setError] = useState<string | null>(null);
     const nav = useNavigate();
 
+    // Track page view
+    useEffect(() => {
+        const urlKind = searchParams.get("kind");
+        track("publish_page_viewed", {
+            kind: urlKind || null,
+            from_url_param: searchParams.get("from") || null,
+            to_url_param: searchParams.get("to") || null,
+        });
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, []); // Only on mount - track and searchParams are stable
+
     // Pre-fill form from URL parameters or restored state
     useEffect(() => {
         // First, try to restore from localStorage (after login)

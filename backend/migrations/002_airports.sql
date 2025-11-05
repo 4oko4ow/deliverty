@@ -1,6 +1,6 @@
 -- 002_airports.sql
 
-CREATE TABLE airport (
+CREATE TABLE IF NOT EXISTS airport (
   iata CHAR(3) PRIMARY KEY,            -- e.g., BKK
   name TEXT NOT NULL,                   -- Suvarnabhumi Airport
   city TEXT,
@@ -23,6 +23,7 @@ BEGIN
 END $$;
 
 -- Extended seed: CIS countries and popular tourist destinations from CIS
+-- Use ON CONFLICT to avoid errors if airports already exist
 INSERT INTO airport (iata, name, city, country, tz) VALUES
 -- Russia (major cities)
 ('SVO','Sheremetyevo','Moscow','Russia','Europe/Moscow'),
@@ -43,6 +44,7 @@ INSERT INTO airport (iata, name, city, country, tz) VALUES
 ('KGD','Khrabrovo','Kaliningrad','Russia','Europe/Kaliningrad'),
 ('MRV','Mineralnye Vody','Mineralnye Vody','Russia','Europe/Moscow'),
 ('ASF','Astrakhan','Astrakhan','Russia','Europe/Samara'),
+('MCX','Uytash','Makhachkala','Russia','Europe/Moscow'),
 ('OMS','Omsk','Omsk','Russia','Asia/Omsk'),
 ('TJM','Roshchino','Tyumen','Russia','Asia/Yekaterinburg'),
 ('CEK','Chelyabinsk','Chelyabinsk','Russia','Asia/Yekaterinburg'),
@@ -232,6 +234,7 @@ INSERT INTO airport (iata, name, city, country, tz) VALUES
 ('YVR','Vancouver','Vancouver','Canada','America/Vancouver'),
 -- Brazil
 ('GRU','Guarulhos','São Paulo','Brazil','America/Sao_Paulo'),
-('GIG','Galeão','Rio de Janeiro','Brazil','America/Sao_Paulo');
+('GIG','Galeão','Rio de Janeiro','Brazil','America/Sao_Paulo')
+ON CONFLICT (iata) DO NOTHING;
 
 -- Later: import a full list (IATA, name, tz) from OpenFlights or OurAirports CSV.

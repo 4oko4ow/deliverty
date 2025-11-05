@@ -1,6 +1,7 @@
 import React, { useEffect, useState, useRef } from "react";
 import { api } from "../lib/api";
 import { HiOutlineLocationMarker, HiOutlineSearch, HiOutlineX } from "react-icons/hi";
+import { usePostHogAnalytics } from "../lib/posthog";
 
 export default function AirportInput({
   label,
@@ -11,6 +12,7 @@ export default function AirportInput({
   value: string;
   onChange: (v: string) => void;
 }) {
+  const { track } = usePostHogAnalytics();
   const [q, setQ] = useState("");
   const [opts, setOpts] = useState<any[]>([]);
   const [loading, setLoading] = useState(false);
@@ -68,6 +70,13 @@ export default function AirportInput({
     setQ(`${iata} — ${name}`);
     setShowDropdown(false);
     setOpts([]); // Clear options to prevent showing dropdown again
+    
+    // Track airport selection
+    track("airport_selected", {
+      iata,
+      airport_name: name,
+      field_label: label,
+    });
   };
 
   const clearSelection = () => {
