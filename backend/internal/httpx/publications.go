@@ -250,10 +250,10 @@ func listMyPublications(pool *pgxpool.Pool) gin.HandlerFunc {
 
 		qry := `
 		  SELECT p.id, p.kind, p.from_iata, p.to_iata, p.date_start, p.date_end, p.item, p.weight, p.reward_hint, p.description,
-		         COALESCE(u.rating_small, 0), COALESCE(u.tg_username, '')
+		         COALESCE(u.rating_small, 0), COALESCE(u.tg_username, ''), p.is_active
 		  FROM publication p
 		  LEFT JOIN app_user u ON u.id = p.user_id
-		  WHERE p.is_active AND p.user_id=$1`
+		  WHERE p.user_id=$1`
 		args := []any{uid}
 
 		if from != "" && to != "" {
@@ -290,6 +290,7 @@ func listMyPublications(pool *pgxpool.Pool) gin.HandlerFunc {
 			Description string `json:"description"`
 			UserRating  int    `json:"user_rating"`
 			Username    string `json:"username"`
+			IsActive    bool   `json:"is_active"`
 		}
 
 		out := []Pub{}
@@ -297,7 +298,7 @@ func listMyPublications(pool *pgxpool.Pool) gin.HandlerFunc {
 		for rows.Next() {
 			var p Pub
 			var ds, de time.Time
-			if err := rows.Scan(&p.ID, &p.Kind, &p.From, &p.To, &ds, &de, &p.Item, &p.Weight, &p.RewardHint, &p.Description, &p.UserRating, &p.Username); err != nil {
+			if err := rows.Scan(&p.ID, &p.Kind, &p.From, &p.To, &ds, &de, &p.Item, &p.Weight, &p.RewardHint, &p.Description, &p.UserRating, &p.Username, &p.IsActive); err != nil {
 				log.Printf("[PUBLICATIONS] Scan error: %v", err)
 				continue
 			}

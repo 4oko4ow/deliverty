@@ -1,13 +1,14 @@
 import { StrictMode, useEffect } from "react";
 import { createRoot } from "react-dom/client";
 import { BrowserRouter, Routes, Route, Link, useLocation } from "react-router-dom";
-import { HiOutlinePaperAirplane, HiOutlinePlusCircle, HiOutlineSearch } from "react-icons/hi";
+import { HiOutlinePaperAirplane, HiOutlinePlusCircle, HiOutlineSearch, HiOutlineUser } from "react-icons/hi";
 import { PostHogProvider, usePostHog } from "posthog-js/react";
 import "./index.css";
 import PublishPage from "./pages/PublishPage";
 import BrowsePage from "./pages/BrowsePage";
 import MatchesPage from "./pages/MatchesPage";
 import AuthPage from "./pages/AuthPage";
+import ProfilePage from "./pages/ProfilePage";
 import PolicyFooter from "./components/PolicyFooter";
 
 const POSTHOG_KEY = import.meta.env.VITE_PUBLIC_POSTHOG_KEY;
@@ -75,6 +76,17 @@ function Header() {
             >
               Создать
             </Link>
+            <Link
+              to="/profile"
+              onClick={() => trackNav("/profile")}
+              className={`px-4 py-2 rounded-lg text-sm font-medium transition-all ${location.pathname === "/profile"
+                ? "bg-primary-50 text-primary-700"
+                : "text-gray-600 hover:text-gray-900 hover:bg-gray-50"
+                }`}
+            >
+              <HiOutlineUser className="w-4 h-4 inline mr-1" />
+              Профиль
+            </Link>
           </nav>
         </div>
       </div>
@@ -120,6 +132,17 @@ function BottomNav() {
           <HiOutlinePlusCircle className="w-6 h-6" />
           <span className="text-xs font-medium">Создать</span>
         </Link>
+        <Link
+          to="/profile"
+          onClick={() => trackNav("/profile")}
+          className={`flex flex-col items-center justify-center gap-1 px-4 py-2 rounded-lg transition-all ${location.pathname === "/profile"
+            ? "text-primary-600"
+            : "text-gray-500"
+            }`}
+        >
+          <HiOutlineUser className="w-6 h-6" />
+          <span className="text-xs font-medium">Профиль</span>
+        </Link>
       </div>
     </nav>
   );
@@ -141,6 +164,7 @@ function App() {
                   <Route path="/" element={<BrowsePage />} />
                   <Route path="/publish" element={<PublishPage />} />
                   <Route path="/matches/:pubId" element={<MatchesPage />} />
+                  <Route path="/profile" element={<ProfilePage />} />
                 </Routes>
               </main>
               <PolicyFooter />

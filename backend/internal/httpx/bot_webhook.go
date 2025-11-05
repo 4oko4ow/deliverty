@@ -40,6 +40,57 @@ func buildProfileText(username string, rating int) string {
 	return fmt.Sprintf("%s📊 Рейтинг: %s (%d)", namePart, stars, rating)
 }
 
+// buildDealStatusKeyboard builds an inline keyboard based on the current deal status
+func buildDealStatusKeyboard(status string, dealID int64) gin.H {
+	var buttons [][]gin.H
+	
+	// Add status buttons based on current status
+	if status == "new" || status == "" {
+		// Show all status buttons for new deals
+		buttons = append(buttons, []gin.H{
+			{
+				"text":          "✅ Согласовать",
+				"callback_data": "deal_status:agreed",
+			},
+		})
+		buttons = append(buttons, []gin.H{
+			{
+				"text":          "✅ Передача завершена",
+				"callback_data": "deal_status:handoff_done",
+			},
+		})
+		buttons = append(buttons, []gin.H{
+			{
+				"text":          "❌ Отменить",
+				"callback_data": "deal_status:cancelled",
+			},
+		})
+	} else if status == "agreed" {
+		// Show "Передача завершена" and "Отменить" buttons
+		buttons = append(buttons, []gin.H{
+			{
+				"text":          "✅ Передача завершена",
+				"callback_data": "deal_status:handoff_done",
+			},
+		})
+		buttons = append(buttons, []gin.H{
+			{
+				"text":          "❌ Отменить",
+				"callback_data": "deal_status:cancelled",
+			},
+		})
+	} else if status == "handoff_done" {
+		// Deal is complete, no status buttons needed
+		// But we can show rating button if not already rated
+		// (This is handled separately in the callback handler)
+	} else if status == "cancelled" {
+		// Deal is cancelled, no buttons
+	}
+	
+	return gin.H{
+		"inline_keyboard": buttons,
+	}
+}
 
 // Telegram Update (trimmed)
 type Update struct {
@@ -114,42 +165,63 @@ func registerBotRoutes(r *gin.Engine, pool *pgxpool.Pool) {
 						
 						setStatus(c, pool, tg, up.CallbackQuery.From.ID, up.CallbackQuery.Message.Chat.ID, status)
 						
-						// Update message to show confirmation
-						statusText := map[string]string{
-							"agreed":      "✅ Согласовано",
-							"handoff_done": "✅ Передача завершена",
-							"cancelled":    "❌ Отменено",
-						}
+						// Find the deal and get counterpart info to rebuild the message
+						var dealID int64
+						var counterpartRating int
+						var counterpartUsername string
+						var currentStatus string
+						_ = pool.QueryRow(c, `
+							SELECT 
+								d.id,
+								d.status,
+								CASE WHEN ur.tg_user_id=$1 THEN ut.rating_small ELSE ur.rating_small END AS counterpart_rating,
+								CASE WHEN ur.tg_user_id=$1 THEN COALESCE(ut.tg_username, '') ELSE COALESCE(ur.tg_username, '') END AS counterpart_username
+							FROM deal d
+							JOIN publication pr ON pr.id=d.request_pub_id
+							JOIN app_user ur ON ur.id=pr.user_id
+							JOIN publication pt ON pt.id=d.trip_pub_id
+							JOIN app_user ut ON ut.id=pt.user_id
+							WHERE (ur.tg_user_id=$1 OR ut.tg_user_id=$1)
+							ORDER BY d.last_message_at DESC LIMIT 1
+						`, up.CallbackQuery.From.ID).Scan(&dealID, &currentStatus, &counterpartRating, &counterpartUsername)
 						
-						_, _ = tg.API("editMessageText", gin.H{
-							"chat_id":    up.CallbackQuery.Message.Chat.ID,
-							"message_id": up.CallbackQuery.Message.MessageID,
-							"text":       fmt.Sprintf("%s\n\nСтатус обновлен.", statusText[status]),
-						})
-						
-						// If status is handoff_done, show rating button
-						if status == "handoff_done" {
-							// Find the deal ID
-							var dealID int64
-							_ = pool.QueryRow(c, `
-								SELECT d.id FROM deal d
-								JOIN publication pr ON pr.id=d.request_pub_id
-								JOIN app_user ur ON ur.id=pr.user_id
-								JOIN publication pt ON pt.id=d.trip_pub_id
-								JOIN app_user ut ON ut.id=pt.user_id
-								WHERE (ur.tg_user_id=$1 OR ut.tg_user_id=$1) AND d.status='handoff_done'
-								ORDER BY d.last_message_at DESC LIMIT 1
-							`, up.CallbackQuery.From.ID).Scan(&dealID)
+						if dealID > 0 {
+							counterpartInfo := buildProfileText(counterpartUsername, counterpartRating)
 							
-							if dealID > 0 {
-								// Check if already rated
+							// Build message text with status info
+							statusText := map[string]string{
+								"agreed":      "✅ Согласовано",
+								"handoff_done": "✅ Передача завершена",
+								"cancelled":    "❌ Отменено",
+							}
+							
+							statusInfo := ""
+							if currentStatus != "new" {
+								statusInfo = fmt.Sprintf("\n\n📊 Статус: %s", statusText[currentStatus])
+							}
+							
+							messageText := fmt.Sprintf("✅ Подключено к сделке!%s\n\n👤 Участник:\n%s\n\nОтправляйте сообщения сюда для пересылки. Используйте кнопки ниже для управления сделкой.", statusInfo, counterpartInfo)
+							
+							// Build keyboard based on current status
+							keyboard := buildDealStatusKeyboard(currentStatus, dealID)
+							
+							// Update message with keyboard preserved
+							_, _ = tg.API("editMessageText", gin.H{
+								"chat_id":      up.CallbackQuery.Message.Chat.ID,
+								"message_id":   up.CallbackQuery.Message.MessageID,
+								"text":         messageText,
+								"reply_markup": keyboard,
+							})
+							
+							// If status is handoff_done, show rating button
+							if status == "handoff_done" {
 								var alreadyRated bool
 								_ = pool.QueryRow(c, `
 									SELECT EXISTS(SELECT 1 FROM rating_log WHERE deal_id=$1 AND rater_tg=$2)
 								`, dealID, up.CallbackQuery.From.ID).Scan(&alreadyRated)
 								
 								if !alreadyRated {
-									keyboard := gin.H{
+									ratingKeyboard := gin.H{
 										"inline_keyboard": [][]gin.H{
 											{
 												{
@@ -163,7 +235,7 @@ func registerBotRoutes(r *gin.Engine, pool *pgxpool.Pool) {
 									_, _ = tg.API("sendMessage", gin.H{
 										"chat_id":      up.CallbackQuery.Message.Chat.ID,
 										"text":         "Пожалуйста, оцените участника сделки.",
-										"reply_markup": keyboard,
+										"reply_markup": ratingKeyboard,
 									})
 								}
 							}
@@ -427,31 +499,27 @@ func processStartDeal(ctx context.Context, pool *pgxpool.Pool, tg *bot.TG, userI
 	
 	counterpartInfo := buildProfileText(counterpartUsername, counterpartRating)
 	
-	// Create inline keyboard with status buttons
-	keyboard := gin.H{
-		"inline_keyboard": [][]gin.H{
-			{
-				{
-					"text":          "✅ Согласовать",
-					"callback_data": "deal_status:agreed",
-				},
-			},
-			{
-				{
-					"text":          "✅ Передача завершена",
-					"callback_data": "deal_status:handoff_done",
-				},
-			},
-			{
-				{
-					"text":          "❌ Отменить",
-					"callback_data": "deal_status:cancelled",
-				},
-			},
-		},
+	// Get current deal status
+	var currentStatus string
+	dealIDInt, _ := strconv.ParseInt(dealID, 10, 64)
+	_ = pool.QueryRow(ctx, `SELECT status FROM deal WHERE id=$1`, dealID).Scan(&currentStatus)
+	
+	// Create inline keyboard with status buttons based on current status
+	keyboard := buildDealStatusKeyboard(currentStatus, dealIDInt)
+	
+	// Build message text with status info
+	statusText := map[string]string{
+		"agreed":      "✅ Согласовано",
+		"handoff_done": "✅ Передача завершена",
+		"cancelled":    "❌ Отменено",
 	}
 	
-	text := fmt.Sprintf("✅ Подключено к сделке!\n\n👤 Участник:\n%s\n\nОтправляйте сообщения сюда для пересылки. Используйте кнопки ниже для управления сделкой.", counterpartInfo)
+	statusInfo := ""
+	if currentStatus != "new" && currentStatus != "" {
+		statusInfo = fmt.Sprintf("\n\n📊 Статус: %s", statusText[currentStatus])
+	}
+	
+	text := fmt.Sprintf("✅ Подключено к сделке!%s\n\n👤 Участник:\n%s\n\nОтправляйте сообщения сюда для пересылки. Используйте кнопки ниже для управления сделкой.", statusInfo, counterpartInfo)
 	_, _ = tg.API("sendMessage", gin.H{
 		"chat_id":      chatID,
 		"text":         text,

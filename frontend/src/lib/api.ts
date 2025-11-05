@@ -120,4 +120,11 @@ export const api = {
     });
     return handleResponse(response);
   },
+
+  getProfile: async () => {
+    const response = await fetch(`${BASE}/profile`, {
+      headers: tgHeader()
+    });
+    return handleResponse(response);
+  },
 };
