@@ -3,7 +3,7 @@ import AirportInput from "../components/AirportInput";
 import UserRating from "../components/UserRating";
 import { api, isAuthenticated } from "../lib/api";
 import { useNavigate } from "react-router-dom";
-import { HiOutlineSearch, HiOutlineLocationMarker, HiOutlineCalendar, HiOutlineCube, HiArrowRight, HiOutlineExclamationCircle } from "react-icons/hi";
+import { HiOutlineSearch, HiOutlineLocationMarker, HiOutlineCalendar, HiOutlineCube, HiArrowRight, HiOutlineExclamationCircle, HiOutlineCheckCircle } from "react-icons/hi";
 import { HiOutlineTruck, HiOutlineGift } from "react-icons/hi2";
 import { formatItem, formatWeight } from "../lib/translations";
 import { usePostHogAnalytics } from "../lib/posthog";
@@ -507,9 +507,31 @@ export default function BrowsePage() {
         </button>
 
         {error && (
-          <div className="flex items-start gap-2 p-4 bg-red-50 border border-red-200 rounded-lg">
-            <HiOutlineExclamationCircle className="w-5 h-5 text-red-600 flex-shrink-0 mt-0.5" />
-            <p className="text-sm text-red-700">{error}</p>
+          <div className={`flex items-start gap-2 p-4 border rounded-lg ${error.includes("Контакты создателя") || error.includes("Создатель объявления получил")
+              ? "bg-green-50 border-green-200"
+              : "bg-red-50 border-red-200"
+            }`}>
+            {error.includes("Контакты создателя") || error.includes("Создатель объявления получил") ? (
+              <HiOutlineCheckCircle className="w-5 h-5 text-green-600 flex-shrink-0 mt-0.5" />
+            ) : (
+              <HiOutlineExclamationCircle className="w-5 h-5 text-red-600 flex-shrink-0 mt-0.5" />
+            )}
+            <div className="flex-1">
+              <p className={`text-sm whitespace-pre-line ${error.includes("Контакты создателя") || error.includes("Создатель объявления получил")
+                  ? "text-green-700"
+                  : "text-red-700"
+                }`}>{error}</p>
+              {error.includes("t.me/") && (
+                <a
+                  href={`https://${error.match(/t\.me\/\w+/)?.[0]}`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="mt-2 inline-block text-sm text-green-700 underline hover:text-green-800"
+                >
+                  Открыть в Telegram
+                </a>
+              )}
+            </div>
           </div>
         )}
       </div>
@@ -653,15 +675,24 @@ export default function BrowsePage() {
                             if (result.error) {
                               setError(result.error || "Не удалось запросить контакты");
                             } else {
-                              // Show success message
-                              const successMsg = "Контакты запрошены! Создатель объявления получит уведомление.";
+                              // Show contacts
+                              let contactsMsg = "Контакты создателя объявления:\n\n";
+                              if (result.username) {
+                                contactsMsg += `Telegram: @${result.username}\n`;
+                                contactsMsg += `Ссылка: https://t.me/${result.username}`;
+                              } else {
+                                contactsMsg += "Контакты не указаны";
+                              }
+                              contactsMsg += "\n\nСоздатель объявления получил уведомление о запросе.";
+
+                              // Show success message with contacts
                               setError(null);
                               // Temporary success message
                               const originalError = error;
-                              setError(successMsg);
+                              setError(contactsMsg);
                               setTimeout(() => {
                                 setError(originalError);
-                              }, 3000);
+                              }, 8000);
                             }
                           } catch (err) {
                             setError("Произошла ошибка при запросе контактов");

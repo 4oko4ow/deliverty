@@ -458,14 +458,15 @@ func requestContacts(pool *pgxpool.Pool) gin.HandlerFunc {
 		// Get publication owner info
 		var ownerTGID int64
 		var ownerUserID int64
+		var ownerUsername string
 		var pubKind string
 		var fromIATA, toIATA string
 		err = pool.QueryRow(c, `
-			SELECT p.user_id, u.tg_user_id, p.kind, p.from_iata, p.to_iata
+			SELECT p.user_id, u.tg_user_id, COALESCE(u.tg_username, ''), p.kind, p.from_iata, p.to_iata
 			FROM publication p
 			JOIN app_user u ON u.id = p.user_id
 			WHERE p.id=$1 AND p.is_active
-		`, pubID).Scan(&ownerUserID, &ownerTGID, &pubKind, &fromIATA, &toIATA)
+		`, pubID).Scan(&ownerUserID, &ownerTGID, &ownerUsername, &pubKind, &fromIATA, &toIATA)
 		if err != nil {
 			c.JSON(http.StatusNotFound, gin.H{"error": "publication not found"})
 			return
@@ -542,7 +543,12 @@ func requestContacts(pool *pgxpool.Pool) gin.HandlerFunc {
 			"reply_markup": keyboard,
 		})
 
-		c.JSON(http.StatusOK, gin.H{"ok": true})
+		// Return owner's contact info to requester
+		c.JSON(http.StatusOK, gin.H{
+			"ok":         true,
+			"username":   ownerUsername,
+			"tg_user_id": ownerTGID,
+		})
 	}
 }
 
