@@ -219,8 +219,8 @@ export default function BrowsePage() {
               kind: "request",
               from_iata: resultPub.from_iata,
               to_iata: resultPub.to_iata,
-              date_start: resultPub.date_start,
-              date_end: resultPub.date_end,
+              date_start: resultPub.date_start || resultPub.date,
+              date_end: resultPub.date_end || resultPub.date,
               item: resultPub.item || "documents",
               weight: resultPub.weight || "envelope",
               description: ""
@@ -337,8 +337,7 @@ export default function BrowsePage() {
               kind: "trip",
               from_iata: resultPub.from_iata,
               to_iata: resultPub.to_iata,
-              date_start: resultPub.date_start,
-              date_end: resultPub.date_end,
+              date: resultPub.date || resultPub.date_start,
               item: resultPub.item || "documents",
               weight: resultPub.weight || "envelope",
               description: ""
@@ -610,7 +609,13 @@ export default function BrowsePage() {
                     <div className="flex flex-col sm:flex-row sm:flex-wrap items-start sm:items-center gap-2 sm:gap-4 text-xs sm:text-sm text-gray-600 mb-4">
                       <div className="flex items-center gap-1.5">
                         <HiOutlineCalendar className="w-4 h-4 sm:w-4 sm:h-4 flex-shrink-0" />
-                        <span className="break-words">{formatDate(r.date_start)} – {formatDate(r.date_end)}</span>
+                        <span className="break-words">
+                          {r.kind === "trip" && r.date
+                            ? formatDate(r.date)
+                            : r.date_start && r.date_end
+                              ? `${formatDate(r.date_start)} – ${formatDate(r.date_end)}`
+                              : ""}
+                        </span>
                       </div>
                       <div className="flex items-center gap-1.5">
                         <HiOutlineCube className="w-4 h-4 sm:w-4 sm:h-4 flex-shrink-0" />
@@ -632,7 +637,39 @@ export default function BrowsePage() {
                       return null;
                     })()}
 
-                    <div className="flex items-center justify-end pt-4 border-t border-gray-100">
+                    <div className="flex items-center justify-end gap-2 pt-4 border-t border-gray-100">
+                      <button
+                        className="btn btn-secondary text-xs sm:text-sm px-4 py-2"
+                        onClick={async () => {
+                          track("request_contacts_clicked", {
+                            pub_id: r.id,
+                            pub_kind: r.kind,
+                            from_iata: r.from_iata,
+                            to_iata: r.to_iata,
+                          });
+
+                          try {
+                            const result: any = await api.requestContacts(r.id);
+                            if (result.error) {
+                              setError(result.error || "Не удалось запросить контакты");
+                            } else {
+                              // Show success message
+                              const successMsg = "Контакты запрошены! Создатель объявления получит уведомление.";
+                              setError(null);
+                              // Temporary success message
+                              const originalError = error;
+                              setError(successMsg);
+                              setTimeout(() => {
+                                setError(originalError);
+                              }, 3000);
+                            }
+                          } catch (err) {
+                            setError("Произошла ошибка при запросе контактов");
+                          }
+                        }}
+                      >
+                        Показать контакты
+                      </button>
                       <button
                         className="btn btn-primary text-xs sm:text-sm px-4 py-2"
                         onClick={() => {

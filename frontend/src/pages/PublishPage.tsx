@@ -81,26 +81,36 @@ export default function PublishPage() {
             return;
         }
 
-        if (!from || !to || !dateStart || !dateEnd) {
-            setError("Заполните все обязательные поля");
-            track("publish_error", { reason: "missing_fields", kind });
-            return;
-        }
+        if (kind === "trip") {
+            // For trips, only date is required
+            if (!from || !to || !dateStart) {
+                setError("Заполните все обязательные поля");
+                track("publish_error", { reason: "missing_fields", kind });
+                return;
+            }
+        } else {
+            // For requests, date range is required
+            if (!from || !to || !dateStart || !dateEnd) {
+                setError("Заполните все обязательные поля");
+                track("publish_error", { reason: "missing_fields", kind });
+                return;
+            }
 
-        // Validate date range
-        const start = new Date(dateStart);
-        const end = new Date(dateEnd);
-        const daysDiff = Math.ceil((end.getTime() - start.getTime()) / (1000 * 60 * 60 * 24));
+            // Validate date range
+            const start = new Date(dateStart);
+            const end = new Date(dateEnd);
+            const daysDiff = Math.ceil((end.getTime() - start.getTime()) / (1000 * 60 * 60 * 24));
 
-        if (daysDiff < 1) {
-            setError("Дата окончания должна быть позже даты начала");
-            track("publish_error", { reason: "invalid_date_range", kind });
-            return;
-        }
-        if (daysDiff > 14) {
-            setError("Диапазон дат не должен превышать 14 дней");
-            track("publish_error", { reason: "date_range_too_long", kind });
-            return;
+            if (daysDiff < 1) {
+                setError("Дата окончания должна быть позже даты начала");
+                track("publish_error", { reason: "invalid_date_range", kind });
+                return;
+            }
+            if (daysDiff > 14) {
+                setError("Диапазон дат не должен превышать 14 дней");
+                track("publish_error", { reason: "date_range_too_long", kind });
+                return;
+            }
         }
 
         setError(null);
@@ -120,12 +130,19 @@ export default function PublishPage() {
                 kind,
                 from_iata: from,
                 to_iata: to,
-                date_start: dateStart,
-                date_end: dateEnd,
                 item,
                 weight,
                 description: desc,
             };
+
+            if (kind === "trip") {
+                // For trips, use single date
+                body.date = dateStart;
+            } else {
+                // For requests, use date range
+                body.date_start = dateStart;
+                body.date_end = dateEnd;
+            }
 
 
             const res = await api.createPub(body);
@@ -171,7 +188,7 @@ export default function PublishPage() {
         }
     }
 
-    const isFormValid = from && to && dateStart && dateEnd;
+    const isFormValid = from && to && dateStart && (kind === "trip" || dateEnd);
 
     return (
         <div className="max-w-2xl mx-auto space-y-6 animate-fade-in">
@@ -246,11 +263,10 @@ export default function PublishPage() {
                 <div>
                     <label className="block text-sm sm:text-sm font-medium text-gray-700 mb-2">
                         <HiOutlineCalendar className="w-4 h-4 sm:w-4 sm:h-4 inline mr-1" />
-                        Период доставки
+                        {kind === "trip" ? "Дата полета" : "Период доставки"}
                     </label>
-                    <div className="grid grid-cols-2 gap-2 sm:gap-3">
+                    {kind === "trip" ? (
                         <div>
-                            <label className="block text-xs sm:text-xs text-gray-500 mb-1">Дата начала</label>
                             <input
                                 className="input"
                                 type="date"
@@ -259,17 +275,30 @@ export default function PublishPage() {
                                 min={new Date().toISOString().split('T')[0]}
                             />
                         </div>
-                        <div>
-                            <label className="block text-xs sm:text-xs text-gray-500 mb-1">Дата окончания</label>
-                            <input
-                                className="input"
-                                type="date"
-                                value={dateEnd}
-                                onChange={(e) => setDE(e.target.value)}
-                                min={dateStart || new Date().toISOString().split('T')[0]}
-                            />
+                    ) : (
+                        <div className="grid grid-cols-2 gap-2 sm:gap-3">
+                            <div>
+                                <label className="block text-xs sm:text-xs text-gray-500 mb-1">Дата начала</label>
+                                <input
+                                    className="input"
+                                    type="date"
+                                    value={dateStart}
+                                    onChange={(e) => setDS(e.target.value)}
+                                    min={new Date().toISOString().split('T')[0]}
+                                />
+                            </div>
+                            <div>
+                                <label className="block text-xs sm:text-xs text-gray-500 mb-1">Дата окончания</label>
+                                <input
+                                    className="input"
+                                    type="date"
+                                    value={dateEnd}
+                                    onChange={(e) => setDE(e.target.value)}
+                                    min={dateStart || new Date().toISOString().split('T')[0]}
+                                />
+                            </div>
                         </div>
-                    </div>
+                    )}
                 </div>
 
                 {/* Item Details */}

@@ -122,4 +122,12 @@ export const api = {
     });
     return handleResponse(response);
   },
+
+  requestContacts: async (pubId: number) => {
+    const response = await fetch(`${BASE}/publications/${pubId}/request-contacts`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", ...tgHeader() },
+    });
+    return handleResponse(response);
+  },
 };

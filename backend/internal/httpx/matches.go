@@ -2,6 +2,7 @@ package httpx
 
 import (
 	"context"
+	"database/sql"
 	"fmt"
 	"log"
 	"net/http"
@@ -21,8 +22,9 @@ type MatchOut struct {
 	Kind       string `json:"kind"`
 	From       string `json:"from_iata"`
 	To         string `json:"to_iata"`
-	DateStart  string `json:"date_start"`
-	DateEnd    string `json:"date_end"`
+	DateStart  string `json:"date_start,omitempty"`
+	DateEnd    string `json:"date_end,omitempty"`
+	Date       string `json:"date,omitempty"`
 	Item       string `json:"item"`
 	Weight     string `json:"weight"`
 	Score      int    `json:"score"`
@@ -56,13 +58,27 @@ func findMatches(pool *pgxpool.Pool) gin.HandlerFunc {
 
 		// Load anchor pub
 		var kind, from, to, item, weight string
-		var aStart, aEnd time.Time
+		var aStart, aEnd sql.NullTime
+		var aDate sql.NullTime
 		err = pool.QueryRow(c, `
-			SELECT kind, from_iata, to_iata, date_start, date_end, item, weight
+			SELECT kind, from_iata, to_iata, date_start, date_end, date, item, weight
 			FROM publication WHERE id=$1 AND is_active`, pubID).
-			Scan(&kind, &from, &to, &aStart, &aEnd, &item, &weight)
+			Scan(&kind, &from, &to, &aStart, &aEnd, &aDate, &item, &weight)
 		if err != nil {
 			c.JSON(http.StatusNotFound, gin.H{"error": "pub not found"})
+			return
+		}
+
+		// Determine anchor date range
+		var anchorStart, anchorEnd time.Time
+		if kind == "trip" && aDate.Valid {
+			anchorStart = aDate.Time
+			anchorEnd = aDate.Time
+		} else if aStart.Valid && aEnd.Valid {
+			anchorStart = aStart.Time
+			anchorEnd = aEnd.Time
+		} else {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "invalid date range"})
 			return
 		}
 
@@ -76,20 +92,47 @@ func findMatches(pool *pgxpool.Pool) gin.HandlerFunc {
 		var anchorUserID int64
 		_ = pool.QueryRow(c, `SELECT user_id FROM publication WHERE id=$1`, pubID).Scan(&anchorUserID)
 
-		rows, err := pool.Query(c, `
-			SELECT p.id, p.kind, p.from_iata, p.to_iata, p.date_start, p.date_end, p.item, p.weight,
-			       COALESCE(u.rating_small, 0), COALESCE(u.tg_username, '')
-			FROM publication p
-			JOIN app_user u ON u.id = p.user_id
-			WHERE p.is_active
-			  AND p.id != $1
-			  AND p.user_id != $7
-			  AND p.kind=$2::pub_type
-			  AND p.from_iata=$3 AND p.to_iata=$4
-			  AND NOT (p.date_end < $5 OR p.date_start > $6)
-			ORDER BY p.created_at DESC
-			LIMIT 50
-		`, pubID, opp, from, to, aStart, aEnd, anchorUserID)
+		// Build query based on opposite kind
+		var rows interface {
+			Close()
+			Err() error
+			Next() bool
+			Scan(dest ...interface{}) error
+		}
+		if opp == "trip" {
+			// Looking for trips - use date field
+			rows, err = pool.Query(c, `
+				SELECT p.id, p.kind, p.from_iata, p.to_iata, p.date_start, p.date_end, p.date, p.item, p.weight,
+				       COALESCE(u.rating_small, 0), COALESCE(u.tg_username, '')
+				FROM publication p
+				JOIN app_user u ON u.id = p.user_id
+				WHERE p.is_active
+				  AND p.id != $1
+				  AND p.user_id != $7
+				  AND p.kind=$2::pub_type
+				  AND p.from_iata=$3 AND p.to_iata=$4
+				  AND p.date IS NOT NULL
+				  AND p.date >= $5 AND p.date <= $6
+				ORDER BY p.created_at DESC
+				LIMIT 50
+			`, pubID, opp, from, to, anchorStart, anchorEnd, anchorUserID)
+		} else {
+			// Looking for requests - use date_start/date_end
+			rows, err = pool.Query(c, `
+				SELECT p.id, p.kind, p.from_iata, p.to_iata, p.date_start, p.date_end, p.date, p.item, p.weight,
+				       COALESCE(u.rating_small, 0), COALESCE(u.tg_username, '')
+				FROM publication p
+				JOIN app_user u ON u.id = p.user_id
+				WHERE p.is_active
+				  AND p.id != $1
+				  AND p.user_id != $7
+				  AND p.kind=$2::pub_type
+				  AND p.from_iata=$3 AND p.to_iata=$4
+				  AND NOT (p.date_end < $5 OR p.date_start > $6)
+				ORDER BY p.created_at DESC
+				LIMIT 50
+			`, pubID, opp, from, to, anchorStart, anchorEnd, anchorUserID)
+		}
 		if err != nil {
 			c.JSON(http.StatusInternalServerError, gin.H{"error": "db"})
 			return
@@ -101,10 +144,23 @@ func findMatches(pool *pgxpool.Pool) gin.HandlerFunc {
 		for rows.Next() {
 			var id int64
 			var k, f, t, it, w string
-			var ds, de time.Time
+			var ds, de sql.NullTime
+			var singleDate sql.NullTime
 			var userRating int
 			var username string
-			if err := rows.Scan(&id, &k, &f, &t, &ds, &de, &it, &w, &userRating, &username); err != nil {
+			if err := rows.Scan(&id, &k, &f, &t, &ds, &de, &singleDate, &it, &w, &userRating, &username); err != nil {
+				continue
+			}
+
+			// Determine candidate date range
+			var candidateStart, candidateEnd time.Time
+			if k == "trip" && singleDate.Valid {
+				candidateStart = singleDate.Time
+				candidateEnd = singleDate.Time
+			} else if ds.Valid && de.Valid {
+				candidateStart = ds.Time
+				candidateEnd = de.Time
+			} else {
 				continue
 			}
 
@@ -119,18 +175,26 @@ func findMatches(pool *pgxpool.Pool) gin.HandlerFunc {
 				continue
 			}
 
-			ov := match.OverlapDays(aStart, aEnd, ds, de)
+			ov := match.OverlapDays(anchorStart, anchorEnd, candidateStart, candidateEnd)
 			score := 10 * ov
 			if it == item {
 				score += 5
 			}
 
-			out = append(out, MatchOut{
+			m := MatchOut{
 				OtherPubID: id, Kind: k, From: f, To: t,
-				DateStart: ds.Format("2006-01-02"), DateEnd: de.Format("2006-01-02"),
 				Item: it, Weight: w, Score: score,
 				UserRating: userRating, Username: username,
-			})
+			}
+
+			if k == "trip" && singleDate.Valid {
+				m.Date = singleDate.Time.Format("2006-01-02")
+			} else if ds.Valid && de.Valid {
+				m.DateStart = ds.Time.Format("2006-01-02")
+				m.DateEnd = de.Time.Format("2006-01-02")
+			}
+
+			out = append(out, m)
 		}
 
 		c.JSON(http.StatusOK, out)

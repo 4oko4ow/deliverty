@@ -247,6 +247,74 @@ func registerBotRoutes(r *gin.Engine, pool *pgxpool.Pool) {
 				}
 			}
 
+			// Handle contact request callbacks
+			if strings.HasPrefix(up.CallbackQuery.Data, "contact_agreed:") {
+				contactRequestIDStr := strings.TrimPrefix(up.CallbackQuery.Data, "contact_agreed:")
+				contactRequestID, err := strconv.ParseInt(contactRequestIDStr, 10, 64)
+				
+				if err == nil {
+					// Answer callback first
+					_, _ = tg.API("answerCallbackQuery", gin.H{
+						"callback_query_id": up.CallbackQuery.ID,
+						"text":             "✅ Спасибо! Объявление скрыто с поиска.",
+					})
+					
+					// Update contact request status
+					var pubID int64
+					err = pool.QueryRow(c, `
+						UPDATE contact_request 
+						SET status='agreed', updated_at=now()
+						WHERE id=$1
+						RETURNING publication_id
+					`, contactRequestID).Scan(&pubID)
+					
+					if err == nil && pubID > 0 {
+						// Hide publication from search
+						_, _ = pool.Exec(c, `UPDATE publication SET is_active=false WHERE id=$1`, pubID)
+						
+						// Update message to show it's been agreed
+						_, _ = tg.API("editMessageText", gin.H{
+							"chat_id":    up.CallbackQuery.Message.Chat.ID,
+							"message_id": up.CallbackQuery.Message.MessageID,
+							"text":       "✅ Договорились! Объявление скрыто с поиска.",
+						})
+					}
+				}
+				
+				c.Status(http.StatusOK)
+				return
+			}
+
+			if strings.HasPrefix(up.CallbackQuery.Data, "contact_declined:") {
+				contactRequestIDStr := strings.TrimPrefix(up.CallbackQuery.Data, "contact_declined:")
+				contactRequestID, err := strconv.ParseInt(contactRequestIDStr, 10, 64)
+				
+				if err == nil {
+					// Answer callback first
+					_, _ = tg.API("answerCallbackQuery", gin.H{
+						"callback_query_id": up.CallbackQuery.ID,
+						"text":             "Объявление остается активным.",
+					})
+					
+					// Update contact request status
+					_, _ = pool.Exec(c, `
+						UPDATE contact_request 
+						SET status='declined', updated_at=now()
+						WHERE id=$1
+					`, contactRequestID)
+					
+					// Update message
+					_, _ = tg.API("editMessageText", gin.H{
+						"chat_id":    up.CallbackQuery.Message.Chat.ID,
+						"message_id": up.CallbackQuery.Message.MessageID,
+						"text":       "❌ Не договорились. Объявление остается активным.",
+					})
+				}
+				
+				c.Status(http.StatusOK)
+				return
+			}
+
 			// Handle rating callback
 			if strings.HasPrefix(up.CallbackQuery.Data, "rate_deal:") {
 				dealIDStr := strings.TrimPrefix(up.CallbackQuery.Data, "rate_deal:")
