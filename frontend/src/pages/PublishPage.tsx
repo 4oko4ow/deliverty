@@ -24,8 +24,34 @@ export default function PublishPage() {
     const [error, setError] = useState<string | null>(null);
     const nav = useNavigate();
 
-    // Pre-fill form from URL parameters
+    // Pre-fill form from URL parameters or restored state
     useEffect(() => {
+        // First, try to restore from localStorage (after login)
+        const savedState = localStorage.getItem("publish_form_state");
+        if (savedState) {
+            try {
+                const formState = JSON.parse(savedState);
+                setKind(formState.kind || "request");
+                setFrom(formState.from || "");
+                setTo(formState.to || "");
+                setDS(formState.dateStart || "");
+                setDE(formState.dateEnd || "");
+                setItem(formState.item || "documents");
+                setWeight(formState.weight || "envelope");
+                setDesc(formState.desc || "");
+                setFlightNo(formState.flightNo || "");
+                setAirline(formState.airline || "");
+                setCapacityHint(formState.capacityHint || "");
+                // Clear saved state after restoring
+                localStorage.removeItem("publish_form_state");
+                return;
+            } catch (e) {
+                console.error("Failed to restore form state:", e);
+                localStorage.removeItem("publish_form_state");
+            }
+        }
+
+        // Otherwise, use URL parameters
         const urlKind = searchParams.get("kind");
         const urlFrom = searchParams.get("from");
         const urlTo = searchParams.get("to");
@@ -45,7 +71,22 @@ export default function PublishPage() {
         // Check authentication before creating publication
         if (!isAuthenticated()) {
             track("publish_attempted_not_authenticated", { kind });
-            nav("/auth");
+            // Save form state to localStorage before redirect
+            const formState = {
+                kind,
+                from,
+                to,
+                dateStart,
+                dateEnd,
+                item,
+                weight,
+                desc,
+                flightNo,
+                airline,
+                capacityHint,
+            };
+            localStorage.setItem("publish_form_state", JSON.stringify(formState));
+            nav(`/auth?return=${encodeURIComponent("/publish")}`);
             return;
         }
 
