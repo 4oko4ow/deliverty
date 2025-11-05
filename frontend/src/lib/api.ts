@@ -100,11 +100,6 @@ export const api = {
     return handleResponse(response);
   },
 
-  matches: async (pubId: string) => {
-    const response = await fetch(`${BASE}/matches?pub_id=${pubId}`);
-    return handleResponse(response);
-  },
-
   createDeal: async (request_pub_id: number, trip_pub_id: number) => {
     const response = await fetch(`${BASE}/deals`, {
       method: "POST",

@@ -2,7 +2,7 @@ import { useState, useEffect } from "react";
 import AirportInput from "../components/AirportInput";
 import { api, isAuthenticated } from "../lib/api";
 import { useNavigate, useSearchParams } from "react-router-dom";
-import { HiOutlineCalendar, HiOutlineCube, HiOutlineExclamationCircle, HiOutlinePaperAirplane } from "react-icons/hi";
+import { HiOutlineCalendar, HiOutlineCube, HiOutlineExclamationCircle } from "react-icons/hi";
 import { HiOutlineSparkles, HiOutlineGift, HiOutlineTruck } from "react-icons/hi2";
 import { usePostHogAnalytics } from "../lib/posthog";
 
@@ -17,9 +17,6 @@ export default function PublishPage() {
     const [item, setItem] = useState("documents");
     const [weight, setWeight] = useState("envelope");
     const [desc, setDesc] = useState("");
-    const [flightNo, setFlightNo] = useState("");
-    const [airline, setAirline] = useState("");
-    const [capacityHint, setCapacityHint] = useState("");
     const [submitting, setSubmitting] = useState(false);
     const [error, setError] = useState<string | null>(null);
     const nav = useNavigate();
@@ -39,9 +36,6 @@ export default function PublishPage() {
                 setItem(formState.item || "documents");
                 setWeight(formState.weight || "envelope");
                 setDesc(formState.desc || "");
-                setFlightNo(formState.flightNo || "");
-                setAirline(formState.airline || "");
-                setCapacityHint(formState.capacityHint || "");
                 // Clear saved state after restoring
                 localStorage.removeItem("publish_form_state");
                 return;
@@ -81,9 +75,6 @@ export default function PublishPage() {
                 item,
                 weight,
                 desc,
-                flightNo,
-                airline,
-                capacityHint,
             };
             localStorage.setItem("publish_form_state", JSON.stringify(formState));
             nav(`/auth?return=${encodeURIComponent("/publish")}`);
@@ -114,18 +105,16 @@ export default function PublishPage() {
 
         setError(null);
         setSubmitting(true);
-        
+
         track("publish_started", {
             kind,
             from_iata: from,
             to_iata: to,
             item,
             weight,
-            has_flight_no: !!flightNo,
-            has_airline: !!airline,
             has_description: !!desc,
         });
-        
+
         try {
             const body: any = {
                 kind,
@@ -138,12 +127,6 @@ export default function PublishPage() {
                 description: desc,
             };
 
-            // Add trip-specific fields
-            if (kind === "trip") {
-                if (flightNo) body.flight_no = flightNo;
-                if (airline) body.airline = airline;
-                if (capacityHint) body.capacity_hint = capacityHint;
-            }
 
             const res = await api.createPub(body);
             if ('error' in res) {
@@ -162,11 +145,10 @@ export default function PublishPage() {
                     to_iata: to,
                     item,
                     weight,
-                    has_flight_no: !!flightNo,
-                    has_airline: !!airline,
                     has_description: !!desc,
                 });
-                nav(`/matches/${res.id}`);
+                // Return to home page after successful publication
+                nav("/");
             } else {
                 setError("Не удалось создать объявление");
                 track("publish_error", {
@@ -216,8 +198,8 @@ export default function PublishPage() {
                                 setKind("request");
                             }}
                             className={`p-3 sm:p-4 rounded-lg border-2 transition-all touch-manipulation min-h-[100px] sm:min-h-[120px] ${kind === "request"
-                                    ? "border-primary-500 bg-primary-50"
-                                    : "border-gray-200 hover:border-gray-300 active:bg-gray-50"
+                                ? "border-primary-500 bg-primary-50"
+                                : "border-gray-200 hover:border-gray-300 active:bg-gray-50"
                                 }`}
                         >
                             <div className="flex flex-col sm:flex-row items-center gap-1.5 sm:gap-2 justify-center mb-2">
@@ -237,8 +219,8 @@ export default function PublishPage() {
                                 setKind("trip");
                             }}
                             className={`p-3 sm:p-4 rounded-lg border-2 transition-all touch-manipulation min-h-[100px] sm:min-h-[120px] ${kind === "trip"
-                                    ? "border-primary-500 bg-primary-50"
-                                    : "border-gray-200 hover:border-gray-300 active:bg-gray-50"
+                                ? "border-primary-500 bg-primary-50"
+                                : "border-gray-200 hover:border-gray-300 active:bg-gray-50"
                                 }`}
                         >
                             <div className="flex flex-col sm:flex-row items-center gap-1.5 sm:gap-2 justify-center mb-2">
@@ -323,53 +305,6 @@ export default function PublishPage() {
                     </div>
                 </div>
 
-                {/* Trip-specific fields */}
-                {kind === "trip" && (
-                    <div className="space-y-4 p-3 sm:p-4 bg-blue-50 rounded-lg border border-blue-200">
-                        <label className="block text-sm sm:text-sm font-medium text-gray-700 mb-3">
-                            <HiOutlinePaperAirplane className="w-4 h-4 sm:w-4 sm:h-4 inline mr-1" />
-                            Информация о рейсе (необязательно)
-                        </label>
-                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 sm:gap-3">
-                            <div>
-                                <label className="block text-xs sm:text-xs text-gray-500 mb-1">Номер рейса</label>
-                                <input
-                                    className="input"
-                                    type="text"
-                                    placeholder="SU123"
-                                    value={flightNo}
-                                    onChange={(e) => setFlightNo(e.target.value)}
-                                    maxLength={20}
-                                />
-                            </div>
-                            <div>
-                                <label className="block text-xs sm:text-xs text-gray-500 mb-1">Авиакомпания</label>
-                                <input
-                                    className="input"
-                                    type="text"
-                                    placeholder="Аэрофлот"
-                                    value={airline}
-                                    onChange={(e) => setAirline(e.target.value)}
-                                    maxLength={50}
-                                />
-                            </div>
-                        </div>
-                        <div>
-                            <label className="block text-xs sm:text-xs text-gray-500 mb-1">Емкость (необязательно)</label>
-                            <input
-                                className="input"
-                                type="text"
-                                placeholder="например: конверт/1кг/3кг"
-                                value={capacityHint}
-                                onChange={(e) => setCapacityHint(e.target.value)}
-                                maxLength={50}
-                            />
-                            <p className="text-xs sm:text-xs text-gray-400 mt-1">
-                                Укажите, что конкретно можете взять с собой
-                            </p>
-                        </div>
-                    </div>
-                )}
 
                 {/* Description */}
                 <div>

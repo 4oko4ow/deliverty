@@ -443,8 +443,7 @@ export default function BrowsePage() {
   return (
     <div className="space-y-6 animate-fade-in">
       <div className="text-center space-y-2">
-        <h1 className="text-2xl sm:text-3xl font-bold text-gray-900">Найдите подходящий вариант</h1>
-        <p className="text-sm sm:text-base text-gray-600">Поиск объявлений по маршруту</p>
+        <h1 className="text-2xl sm:text-3xl font-bold text-gray-900">Поиск</h1>
       </div>
 
       <div className="card p-4 sm:p-6 space-y-4">
@@ -488,11 +487,6 @@ export default function BrowsePage() {
               <span>лечу</span>
             </button>
           </div>
-          <p className="text-xs text-gray-500 mt-2 text-center">
-            {kindFilter === "request"
-              ? "Найду путешественников, которые летят по вашему маршруту"
-              : "Найду запросы на доставку по вашему маршруту"}
-          </p>
         </div>
 
         <button

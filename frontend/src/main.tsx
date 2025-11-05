@@ -6,7 +6,6 @@ import { PostHogProvider, usePostHog } from "posthog-js/react";
 import "./index.css";
 import PublishPage from "./pages/PublishPage";
 import BrowsePage from "./pages/BrowsePage";
-import MatchesPage from "./pages/MatchesPage";
 import AuthPage from "./pages/AuthPage";
 import ProfilePage from "./pages/ProfilePage";
 import PolicyFooter from "./components/PolicyFooter";
@@ -163,7 +162,6 @@ function App() {
                 <Routes>
                   <Route path="/" element={<BrowsePage />} />
                   <Route path="/publish" element={<PublishPage />} />
-                  <Route path="/matches/:pubId" element={<MatchesPage />} />
                   <Route path="/profile" element={<ProfilePage />} />
                 </Routes>
               </main>
