@@ -6,3 +6,4 @@ CREATE TABLE rating_log (
   PRIMARY KEY (deal_id, rater_tg)
 );
 
+

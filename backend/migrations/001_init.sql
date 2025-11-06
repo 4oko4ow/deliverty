@@ -63,3 +63,4 @@ CREATE INDEX idx_pub_route_dates ON publication(from_iata, to_iata, date_start, 
 CREATE INDEX idx_pub_kind_active ON publication(kind, is_active);
 CREATE INDEX idx_deal_status ON deal(status);
 
+

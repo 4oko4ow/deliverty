@@ -46,3 +46,4 @@ func Verify(payload, sig string) bool {
 	return Sign(payload) == sig
 }
 
+

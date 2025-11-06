@@ -154,3 +154,4 @@ echo "  - Request ID: $REQ_ID"
 echo "  - Trip ID: $TRIP_ID"
 echo "  - Deal ID: $DEAL_ID"
 
+

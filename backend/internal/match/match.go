@@ -32,3 +32,4 @@ func WeightOK(req, trip string) bool {
 	return order[trip] >= order[req]
 }
 
+

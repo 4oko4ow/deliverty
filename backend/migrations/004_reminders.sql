@@ -3,3 +3,4 @@ CREATE TABLE reminder_log (
   created_at TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 
+
