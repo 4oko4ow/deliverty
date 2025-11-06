@@ -3,6 +3,119 @@
 
 ALTER TABLE airport ADD COLUMN IF NOT EXISTS city_ru TEXT;
 
+-- Russia
+UPDATE airport SET city_ru = 'Москва' WHERE iata = 'SVO';
+UPDATE airport SET city_ru = 'Москва' WHERE iata = 'DME';
+UPDATE airport SET city_ru = 'Москва' WHERE iata = 'VKO';
+UPDATE airport SET city_ru = 'Санкт-Петербург' WHERE iata = 'LED';
+UPDATE airport SET city_ru = 'Краснодар' WHERE iata = 'KRR';
+UPDATE airport SET city_ru = 'Ростов-на-Дону' WHERE iata = 'ROV';
+UPDATE airport SET city_ru = 'Сочи' WHERE iata = 'AER';
+UPDATE airport SET city_ru = 'Казань' WHERE iata = 'KZN';
+UPDATE airport SET city_ru = 'Уфа' WHERE iata = 'UFA';
+UPDATE airport SET city_ru = 'Екатеринбург' WHERE iata = 'SVX';
+UPDATE airport SET city_ru = 'Новосибирск' WHERE iata = 'OVB';
+UPDATE airport SET city_ru = 'Красноярск' WHERE iata = 'KJA';
+UPDATE airport SET city_ru = 'Иркутск' WHERE iata = 'IKT';
+UPDATE airport SET city_ru = 'Владивосток' WHERE iata = 'VVO';
+UPDATE airport SET city_ru = 'Хабаровск' WHERE iata = 'KHV';
+UPDATE airport SET city_ru = 'Калининград' WHERE iata = 'KGD';
+UPDATE airport SET city_ru = 'Минеральные Воды' WHERE iata = 'MRV';
+UPDATE airport SET city_ru = 'Астрахань' WHERE iata = 'ASF';
+UPDATE airport SET city_ru = 'Махачкала' WHERE iata = 'MCX';
+UPDATE airport SET city_ru = 'Грозный' WHERE iata = 'GRZ';
+UPDATE airport SET city_ru = 'Омск' WHERE iata = 'OMS';
+UPDATE airport SET city_ru = 'Тюмень' WHERE iata = 'TJM';
+UPDATE airport SET city_ru = 'Челябинск' WHERE iata = 'CEK';
+UPDATE airport SET city_ru = 'Нижневартовск' WHERE iata = 'NJC';
+UPDATE airport SET city_ru = 'Барнаул' WHERE iata = 'BAX';
+UPDATE airport SET city_ru = 'Новый Уренгой' WHERE iata = 'NUX';
+UPDATE airport SET city_ru = 'Самара' WHERE iata = 'KUF';
+UPDATE airport SET city_ru = 'Пермь' WHERE iata = 'PEE';
+UPDATE airport SET city_ru = 'Саратов' WHERE iata = 'RTW';
+UPDATE airport SET city_ru = 'Волгоград' WHERE iata = 'VOG';
+UPDATE airport SET city_ru = 'Воронеж' WHERE iata = 'VOZ';
+UPDATE airport SET city_ru = 'Белгород' WHERE iata = 'EGO';
+UPDATE airport SET city_ru = 'Мурманск' WHERE iata = 'MMK';
+UPDATE airport SET city_ru = 'Архангельск' WHERE iata = 'ARH';
+UPDATE airport SET city_ru = 'Псков' WHERE iata = 'PKV';
+UPDATE airport SET city_ru = 'Сыктывкар' WHERE iata = 'SCW';
+UPDATE airport SET city_ru = 'Иваново' WHERE iata = 'IWA';
+UPDATE airport SET city_ru = 'Тверь' WHERE iata = 'KLD';
+UPDATE airport SET city_ru = 'Калуга' WHERE iata = 'KLF';
+UPDATE airport SET city_ru = 'Орск' WHERE iata = 'OSW';
+UPDATE airport SET city_ru = 'Сургут' WHERE iata = 'SGC';
+UPDATE airport SET city_ru = 'Магнитогорск' WHERE iata = 'MQF';
+UPDATE airport SET city_ru = 'Брянск' WHERE iata = 'BZK';
+UPDATE airport SET city_ru = 'Кострома' WHERE iata = 'KMW';
+UPDATE airport SET city_ru = 'Липецк' WHERE iata = 'LPK';
+UPDATE airport SET city_ru = 'Набережные Челны' WHERE iata = 'NBC';
+UPDATE airport SET city_ru = 'Рязань' WHERE iata = 'RZN';
+UPDATE airport SET city_ru = 'Тамбов' WHERE iata = 'TBW';
+UPDATE airport SET city_ru = 'Томск' WHERE iata = 'TOF';
+UPDATE airport SET city_ru = 'Ульяновск' WHERE iata = 'ULY';
+UPDATE airport SET city_ru = 'Якутск' WHERE iata = 'YKS';
+UPDATE airport SET city_ru = 'Мирный' WHERE iata = 'MJZ';
+UPDATE airport SET city_ru = 'Петропавловск-Камчатский' WHERE iata = 'PKC';
+
+-- Ukraine
+UPDATE airport SET city_ru = 'Киев' WHERE iata = 'KBP';
+UPDATE airport SET city_ru = 'Киев' WHERE iata = 'IEV';
+UPDATE airport SET city_ru = 'Одесса' WHERE iata = 'ODS';
+UPDATE airport SET city_ru = 'Харьков' WHERE iata = 'HRK';
+UPDATE airport SET city_ru = 'Днепр' WHERE iata = 'DNK';
+UPDATE airport SET city_ru = 'Львов' WHERE iata = 'LWO';
+UPDATE airport SET city_ru = 'Запорожье' WHERE iata = 'ZTR';
+
+-- Belarus
+UPDATE airport SET city_ru = 'Минск' WHERE iata = 'MSQ';
+
+-- Kazakhstan
+UPDATE airport SET city_ru = 'Алматы' WHERE iata = 'ALA';
+UPDATE airport SET city_ru = 'Нур-Султан' WHERE iata = 'NQZ';
+UPDATE airport SET city_ru = 'Актобе' WHERE iata = 'AKX';
+UPDATE airport SET city_ru = 'Атырау' WHERE iata = 'GUW';
+UPDATE airport SET city_ru = 'Караганда' WHERE iata = 'KGF';
+UPDATE airport SET city_ru = 'Семей' WHERE iata = 'PLX';
+UPDATE airport SET city_ru = 'Актау' WHERE iata = 'SCO';
+UPDATE airport SET city_ru = 'Шымкент' WHERE iata = 'CIT';
+UPDATE airport SET city_ru = 'Павлодар' WHERE iata = 'PWQ';
+UPDATE airport SET city_ru = 'Усть-Каменогорск' WHERE iata = 'UKK';
+UPDATE airport SET city_ru = 'Кызылорда' WHERE iata = 'KZO';
+UPDATE airport SET city_ru = 'Талдыкорган' WHERE iata = 'TDK';
+UPDATE airport SET city_ru = 'Жезказган' WHERE iata = 'DZN';
+UPDATE airport SET city_ru = 'Костанай' WHERE iata = 'KSN';
+UPDATE airport SET city_ru = 'Тараз' WHERE iata = 'KVD';
+
+-- Uzbekistan
+UPDATE airport SET city_ru = 'Ташкент' WHERE iata = 'TAS';
+UPDATE airport SET city_ru = 'Самарканд' WHERE iata = 'SKD';
+UPDATE airport SET city_ru = 'Бухара' WHERE iata = 'BHK';
+
+-- Kyrgyzstan
+UPDATE airport SET city_ru = 'Бишкек' WHERE iata = 'FRU';
+UPDATE airport SET city_ru = 'Ош' WHERE iata = 'OSS';
+
+-- Tajikistan
+UPDATE airport SET city_ru = 'Душанбе' WHERE iata = 'DYU';
+
+-- Armenia
+UPDATE airport SET city_ru = 'Ереван' WHERE iata = 'EVN';
+
+-- Georgia
+UPDATE airport SET city_ru = 'Тбилиси' WHERE iata = 'TBS';
+UPDATE airport SET city_ru = 'Батуми' WHERE iata = 'BUS';
+UPDATE airport SET city_ru = 'Кутаиси' WHERE iata = 'KUT';
+
+-- Azerbaijan
+UPDATE airport SET city_ru = 'Баку' WHERE iata = 'GYD';
+
+-- Moldova
+UPDATE airport SET city_ru = 'Кишинёв' WHERE iata = 'KIV';
+
+-- Turkmenistan
+UPDATE airport SET city_ru = 'Ашхабад' WHERE iata = 'ASB';
+
 -- Update Vietnam airports with Russian names
 UPDATE airport SET city_ru = 'Ханой' WHERE iata = 'HAN';
 UPDATE airport SET city_ru = 'Хошимин' WHERE iata = 'SGN';

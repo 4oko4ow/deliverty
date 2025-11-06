@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import AirportInput from "../components/AirportInput";
 import UserRating from "../components/UserRating";
 import SEO from "../components/SEO";
@@ -23,6 +23,7 @@ export default function BrowsePage() {
   const [creating, setCreating] = useState<number | null>(null);
   const [telegramLink, setTelegramLink] = useState<string | null>(null);
   const [popularRoutes, setPopularRoutes] = useState<any[]>([]);
+  const displayedRoutesTracked = useRef(false);
 
   // Helper function to track events
   const track = (eventName: string, properties?: Record<string, any>) => {
@@ -50,13 +51,39 @@ export default function BrowsePage() {
         const routes: any = await api.getPopularRoutes();
         if (Array.isArray(routes)) {
           setPopularRoutes(routes);
+          track("popular_routes_loaded", {
+            routes_count: routes.length,
+            routes: routes.map((r: any) => ({
+              from_iata: r.from_iata,
+              to_iata: r.to_iata,
+              count: r.count,
+            })),
+          });
         }
       } catch (err) {
         console.error("Failed to load popular routes:", err);
+        track("popular_routes_load_error", {
+          error: String(err),
+        });
       }
     }
     loadPopularRoutes();
   }, []);
+
+  // Track when popular routes are displayed (only once)
+  useEffect(() => {
+    if (!searched && popularRoutes.length > 0 && !displayedRoutesTracked.current) {
+      displayedRoutesTracked.current = true;
+      track("popular_routes_displayed", {
+        routes_count: popularRoutes.length,
+        total_publications: popularRoutes.reduce((sum, r) => sum + (r.count || 0), 0),
+      });
+    }
+    // Reset when search is performed
+    if (searched) {
+      displayedRoutesTracked.current = false;
+    }
+  }, [popularRoutes, searched]);
 
   // Restore search state after login
   useEffect(() => {
@@ -522,7 +549,10 @@ export default function BrowsePage() {
                     track("popular_route_clicked", {
                       from_iata: route.from_iata,
                       to_iata: route.to_iata,
-                      count: route.count,
+                      from_city: route.from_city || route.from_iata,
+                      to_city: route.to_city || route.to_iata,
+                      publications_count: route.count,
+                      current_kind_filter: kindFilter,
                     });
                     setFrom(route.from_iata);
                     setTo(route.to_iata);
@@ -534,25 +564,19 @@ export default function BrowsePage() {
                     track("search_started", {
                       from_iata: route.from_iata,
                       to_iata: route.to_iata,
-                      kind_filter: kindFilter,
+                      kind_filter: "all",
                       source: "popular_route",
                     });
 
                     try {
-                      let searchKind: string | undefined;
-                      if (kindFilter === "request") {
-                        searchKind = "trip";
-                      } else if (kindFilter === "trip") {
-                        searchKind = "request";
-                      }
-
-                      const result: any = await api.listPubs(route.from_iata, route.to_iata, searchKind);
+                      // Show all types when clicking popular route
+                      const result: any = await api.listPubs(route.from_iata, route.to_iata, undefined);
                       if (Array.isArray(result)) {
                         setRows(result);
                         track("search_completed", {
                           from_iata: route.from_iata,
                           to_iata: route.to_iata,
-                          kind_filter: kindFilter,
+                          kind_filter: "all",
                           results_count: result.length,
                           source: "popular_route",
                         });
@@ -561,7 +585,7 @@ export default function BrowsePage() {
                           track("search_results_viewed", {
                             from_iata: route.from_iata,
                             to_iata: route.to_iata,
-                            kind_filter: kindFilter,
+                            kind_filter: "all",
                             results_count: result.length,
                             source: "popular_route",
                           });
@@ -578,7 +602,7 @@ export default function BrowsePage() {
                       track("search_error", {
                         from_iata: route.from_iata,
                         to_iata: route.to_iata,
-                        kind_filter: kindFilter,
+                        kind_filter: "all",
                         error: String(err),
                         source: "popular_route",
                       });
@@ -586,9 +610,12 @@ export default function BrowsePage() {
                       setLoading(false);
                     }
                   }}
-                  className="px-3 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 hover:border-gray-400 active:bg-gray-100 transition-colors touch-manipulation"
+                  className="px-3 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 hover:border-gray-400 active:bg-gray-100 transition-colors touch-manipulation flex items-center gap-1.5"
                 >
-                  {route.from_city || route.from_iata} → {route.to_city || route.to_iata} ({route.count})
+                  <span>{route.from_city || route.from_iata} → {route.to_city || route.to_iata}</span>
+                  <span className="px-1.5 py-0.5 bg-blue-100 text-blue-700 rounded font-semibold text-xs">
+                    {route.count}
+                  </span>
                 </button>
               ))}
             </div>
