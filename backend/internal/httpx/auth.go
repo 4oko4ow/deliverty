@@ -147,7 +147,7 @@ func handleTelegramAuth(pool *pgxpool.Pool) gin.HandlerFunc {
 			}
 
 			if err := json.Unmarshal(body, &apiResp); err != nil {
-				log.Printf("[AUTH] Failed to parse Telegram API response for user %d: %v (body: %s)", userID, err, string(body))
+				log.Printf("[AUTH] Failed to parse Telegram API response for user %d: %v", userID, err)
 				return
 			}
 

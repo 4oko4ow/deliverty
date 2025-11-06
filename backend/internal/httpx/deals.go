@@ -68,7 +68,7 @@ func dealDeepLink(pool *pgxpool.Pool) gin.HandlerFunc {
 		encodedStart := url.QueryEscape(startParam)
 		link := fmt.Sprintf("https://t.me/%s?start=%s", botName, encodedStart)
 		
-		log.Printf("[DEEPLINK] Generated link: payload=%q, sig=%q, startParam=%q, encoded=%q, link=%q", payload, sig, startParam, encodedStart, link)
+		log.Printf("[DEEPLINK] Generated link for deal %s", dealID)
 
 		c.JSON(http.StatusOK, gin.H{"url": link})
 	}

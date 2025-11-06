@@ -210,7 +210,7 @@ func listPublications(pool *pgxpool.Pool) gin.HandlerFunc {
 
 		rows, err := pool.Query(c, qry, args...)
 		if err != nil {
-			log.Printf("[PUBLICATIONS] Database error: %v, query: %s, args: %v", err, qry, args)
+			log.Printf("[PUBLICATIONS] Database error: %v", err)
 			c.JSON(http.StatusInternalServerError, gin.H{"error": "ошибка базы данных"})
 			return
 		}
@@ -362,7 +362,7 @@ func listMyPublications(pool *pgxpool.Pool) gin.HandlerFunc {
 
 		rows, err := pool.Query(c, qry, args...)
 		if err != nil {
-			log.Printf("[PUBLICATIONS] Database error: %v, query: %s, args: %v", err, qry, args)
+			log.Printf("[PUBLICATIONS] Database error: %v", err)
 			c.JSON(http.StatusInternalServerError, gin.H{"error": "ошибка базы данных"})
 			return
 		}
