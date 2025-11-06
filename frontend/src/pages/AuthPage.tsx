@@ -1,8 +1,9 @@
 import { useEffect, useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import SEO from "../components/SEO";
+import Logo from "../components/Logo";
 import TelegramLogin from "../components/TelegramLogin";
-import { HiOutlinePaperAirplane, HiOutlineCheckCircle, HiOutlineX } from "react-icons/hi";
+import { HiOutlineCheckCircle, HiOutlineX } from "react-icons/hi";
 import { usePostHog } from "posthog-js/react";
 
 const TG_BOT = import.meta.env.VITE_TG_BOT || "your_bot";
@@ -105,10 +106,10 @@ export default function AuthPage() {
       />
       <div className="min-h-screen flex items-center justify-center px-4">
         <div className="max-w-md w-full">
-          <div className="text-center mb-8">
-            <div className="inline-flex items-center justify-center w-16 h-16 bg-gradient-to-br from-primary-500 to-primary-600 rounded-2xl shadow-lg mb-4">
-              <HiOutlinePaperAirplane className="w-8 h-8 text-white" />
-            </div>
+        <div className="text-center mb-8">
+          <div className="inline-flex items-center justify-center w-16 h-16 bg-gradient-to-br from-primary-500 to-primary-600 rounded-2xl shadow-lg mb-4 p-3">
+            <Logo size="lg" />
+          </div>
             <h1 className="text-3xl font-bold text-gray-900 mb-2">
               Добро пожаловать в Deliverty
             </h1>

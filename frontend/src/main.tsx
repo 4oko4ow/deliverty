@@ -1,7 +1,7 @@
 import { StrictMode, useEffect } from "react";
 import { createRoot } from "react-dom/client";
 import { BrowserRouter, Routes, Route, Link, useLocation } from "react-router-dom";
-import { HiOutlinePaperAirplane, HiOutlinePlusCircle, HiOutlineSearch, HiOutlineUser } from "react-icons/hi";
+import { HiOutlinePlusCircle, HiOutlineSearch, HiOutlineUser } from "react-icons/hi";
 import { PostHogProvider, usePostHog } from "posthog-js/react";
 import { HelmetProvider } from "react-helmet-async";
 import "./index.css";
@@ -11,6 +11,7 @@ import AuthPage from "./pages/AuthPage";
 import ProfilePage from "./pages/ProfilePage";
 import PolicyFooter from "./components/PolicyFooter";
 import SupportBanner from "./components/SupportBanner";
+import Logo from "./components/Logo";
 
 const POSTHOG_KEY = import.meta.env.VITE_PUBLIC_POSTHOG_KEY;
 const POSTHOG_HOST = import.meta.env.VITE_PUBLIC_POSTHOG_HOST || 'https://app.posthog.com';
@@ -50,7 +51,7 @@ function Header() {
         <div className="flex items-center justify-between">
           <Link to="/" onClick={() => trackNav("/")} className="flex items-center gap-2 group">
             <div className="p-2 bg-gradient-to-br from-primary-500 to-primary-600 rounded-lg shadow-lg group-hover:shadow-xl transition-shadow">
-              <HiOutlinePaperAirplane className="w-5 h-5 text-white" />
+              <Logo size="sm" />
             </div>
             <span className="text-2xl font-bold bg-gradient-to-r from-primary-600 to-primary-700 bg-clip-text text-transparent">
               Deliverty
