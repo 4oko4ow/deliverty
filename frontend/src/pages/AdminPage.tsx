@@ -4,6 +4,7 @@ import SEO from "../components/SEO";
 import { api, isAuthenticated } from "../lib/api";
 import { useNavigate } from "react-router-dom";
 import { HiOutlineCalendar, HiOutlineCube, HiOutlineExclamationCircle, HiOutlineUser } from "react-icons/hi";
+import { HiOutlineGift, HiOutlineTruck } from "react-icons/hi2";
 
 export default function AdminPage() {
     const nav = useNavigate();
@@ -16,13 +17,11 @@ export default function AdminPage() {
     const [item, setItem] = useState("documents");
     const [weight, setWeight] = useState("envelope");
     const [desc, setDesc] = useState("");
-    const [rewardHint, setRewardHint] = useState("");
     const [flightNo, setFlightNo] = useState("");
     const [airline, setAirline] = useState("");
     const [capacityHint, setCapacityHint] = useState("");
     
-    // Поля для указания пользователя
-    const [tgUserID, setTgUserID] = useState("");
+    // Поле для указания пользователя
     const [tgUsername, setTgUsername] = useState("");
     
     const [submitting, setSubmitting] = useState(false);
@@ -63,8 +62,8 @@ export default function AdminPage() {
             }
         }
 
-        if (!tgUserID && !tgUsername) {
-            setError("Укажите tg_user_id или tg_username");
+        if (!tgUsername) {
+            setError("Укажите Telegram username");
             return;
         }
 
@@ -89,17 +88,11 @@ export default function AdminPage() {
             }
 
             if (desc) body.description = desc;
-            if (rewardHint) body.reward_hint = parseInt(rewardHint);
             if (flightNo) body.flight_no = flightNo;
             if (airline) body.airline = airline;
             if (capacityHint) body.capacity_hint = capacityHint;
 
-            if (tgUserID) {
-                body.tg_user_id = parseInt(tgUserID);
-            }
-            if (tgUsername) {
-                body.tg_username = tgUsername;
-            }
+            body.tg_username = tgUsername;
 
             const result = await api.createAdminPub(body);
             
@@ -114,11 +107,9 @@ export default function AdminPage() {
                 setDE("");
                 setDate("");
                 setDesc("");
-                setRewardHint("");
                 setFlightNo("");
                 setAirline("");
                 setCapacityHint("");
-                setTgUserID("");
                 setTgUsername("");
             }
         } catch (err: any) {
@@ -156,30 +147,46 @@ export default function AdminPage() {
                 <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6 space-y-6">
                     {/* Тип объявления */}
                     <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-2">
+                        <label className="block text-sm font-medium text-gray-700 mb-3">
                             Тип объявления
                         </label>
-                        <div className="flex gap-4">
-                            <label className="flex items-center">
-                                <input
-                                    type="radio"
-                                    value="request"
-                                    checked={kind === "request"}
-                                    onChange={(e) => setKind(e.target.value as "request")}
-                                    className="mr-2"
-                                />
-                                <span>Запрос</span>
-                            </label>
-                            <label className="flex items-center">
-                                <input
-                                    type="radio"
-                                    value="trip"
-                                    checked={kind === "trip"}
-                                    onChange={(e) => setKind(e.target.value as "trip")}
-                                    className="mr-2"
-                                />
-                                <span>Поездка</span>
-                            </label>
+                        <div className="grid grid-cols-2 gap-3">
+                            <button
+                                type="button"
+                                onClick={() => setKind("request")}
+                                className={`p-4 rounded-lg border-2 transition-all touch-manipulation min-h-[110px] ${kind === "request"
+                                    ? "border-primary-500 bg-primary-50"
+                                    : "border-gray-200 hover:border-gray-300 active:bg-gray-50"
+                                    }`}
+                            >
+                                <div className="flex flex-col items-center gap-2 justify-center mb-2">
+                                    <HiOutlineGift className={`w-6 h-6 ${kind === "request" ? "text-primary-600" : "text-gray-400"}`} />
+                                    <span className={`font-semibold text-base ${kind === "request" ? "text-primary-900" : "text-gray-600"}`}>
+                                        Запрос
+                                    </span>
+                                </div>
+                                <p className="text-xs text-gray-500 text-center">
+                                    Нужна доставка
+                                </p>
+                            </button>
+                            <button
+                                type="button"
+                                onClick={() => setKind("trip")}
+                                className={`p-4 rounded-lg border-2 transition-all touch-manipulation min-h-[110px] ${kind === "trip"
+                                    ? "border-primary-500 bg-primary-50"
+                                    : "border-gray-200 hover:border-gray-300 active:bg-gray-50"
+                                    }`}
+                            >
+                                <div className="flex flex-col items-center gap-2 justify-center mb-2">
+                                    <HiOutlineTruck className={`w-6 h-6 ${kind === "trip" ? "text-primary-600" : "text-gray-400"}`} />
+                                    <span className={`font-semibold text-base ${kind === "trip" ? "text-primary-900" : "text-gray-600"}`}>
+                                        Поездка
+                                    </span>
+                                </div>
+                                <p className="text-xs text-gray-500 text-center">
+                                    Могу взять посылку
+                                </p>
+                            </button>
                         </div>
                     </div>
 
@@ -187,34 +194,19 @@ export default function AdminPage() {
                     <div className="border-t pt-6">
                         <label className="block text-sm font-medium text-gray-700 mb-2">
                             <HiOutlineUser className="w-4 h-4 inline mr-1" />
-                            Пользователь (укажите один из вариантов)
+                            Пользователь
                         </label>
-                        <div className="space-y-4">
-                            <div>
-                                <label className="block text-sm text-gray-600 mb-1">
-                                    Telegram User ID
-                                </label>
-                                <input
-                                    type="number"
-                                    value={tgUserID}
-                                    onChange={(e) => setTgUserID(e.target.value)}
-                                    placeholder="123456789"
-                                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent"
-                                />
-                            </div>
-                            <div className="text-sm text-gray-500">или</div>
-                            <div>
-                                <label className="block text-sm text-gray-600 mb-1">
-                                    Telegram Username (без @)
-                                </label>
-                                <input
-                                    type="text"
-                                    value={tgUsername}
-                                    onChange={(e) => setTgUsername(e.target.value)}
-                                    placeholder="username"
-                                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent"
-                                />
-                            </div>
+                        <div>
+                            <label className="block text-sm text-gray-600 mb-1">
+                                Telegram Username (без @)
+                            </label>
+                            <input
+                                type="text"
+                                value={tgUsername}
+                                onChange={(e) => setTgUsername(e.target.value)}
+                                placeholder="username"
+                                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent"
+                            />
                         </div>
                     </div>
 
@@ -361,20 +353,6 @@ export default function AdminPage() {
                         </div>
                     )}
 
-                    {/* Вознаграждение */}
-                    <div className="border-t pt-6">
-                        <label className="block text-sm font-medium text-gray-700 mb-1">
-                            Вознаграждение (необязательно)
-                        </label>
-                        <input
-                            type="number"
-                            value={rewardHint}
-                            onChange={(e) => setRewardHint(e.target.value)}
-                            placeholder="1000"
-                            className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent"
-                        />
-                    </div>
-
                     {/* Кнопка отправки */}
                     <div className="border-t pt-6">
                         <button
@@ -389,9 +367,9 @@ export default function AdminPage() {
 
                 <div className="mt-6 p-4 bg-yellow-50 border border-yellow-200 rounded-lg">
                     <p className="text-sm text-yellow-800">
-                        <strong>Важно:</strong> Если указан только username без tg_user_id, для внешних пользователей будет создан специальный ID. 
+                        <strong>Важно:</strong> Для внешних пользователей будет создан специальный ID на основе username. 
                         Когда реальный пользователь с таким username зарегистрируется, он создаст нового пользователя с реальным ID, 
-                        а публикации останутся привязанными к старому пользователю. Рекомендуется использовать реальный tg_user_id, если он известен.
+                        а публикации останутся привязанными к старому пользователю.
                     </p>
                 </div>
             </div>
