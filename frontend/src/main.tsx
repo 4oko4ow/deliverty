@@ -9,6 +9,7 @@ import BrowsePage from "./pages/BrowsePage";
 import AuthPage from "./pages/AuthPage";
 import ProfilePage from "./pages/ProfilePage";
 import PolicyFooter from "./components/PolicyFooter";
+import SupportBanner from "./components/SupportBanner";
 
 const POSTHOG_KEY = import.meta.env.VITE_PUBLIC_POSTHOG_KEY;
 const POSTHOG_HOST = import.meta.env.VITE_PUBLIC_POSTHOG_HOST || 'https://app.posthog.com';
@@ -164,6 +165,9 @@ function App() {
                   <Route path="/publish" element={<PublishPage />} />
                   <Route path="/profile" element={<ProfilePage />} />
                 </Routes>
+                <div className="mt-8">
+                  <SupportBanner />
+                </div>
               </main>
               <PolicyFooter />
               <BottomNav />

@@ -24,6 +24,7 @@
 |----------|----------|-------------|---------|
 | `VITE_API_BASE` | ✅ **Required** | Backend API base URL (must include `/api`) | `https://deliverty-api.onrender.com/api` |
 | `VITE_TG_BOT` | ✅ **Required** | Telegram bot username (without @) | `deliverty_bot` |
+| `VITE_SUPPORT_TELEGRAM` | ❌ Optional | Telegram username for support (without @) - shows support banner | `your_username` |
 | `VITE_PUBLIC_POSTHOG_KEY` | ❌ Optional | PostHog project API key for analytics | `phc_xxxxxxxxxxxxxxxxxxxx` |
 | `VITE_PUBLIC_POSTHOG_HOST` | ❌ Optional | PostHog host URL (defaults to `https://app.posthog.com`) | `https://app.posthog.com` or `https://us.i.posthog.com` or `https://eu.posthog.com` |
 
