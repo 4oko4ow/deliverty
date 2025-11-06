@@ -89,7 +89,7 @@ func listAirports(pool *pgxpool.Pool) gin.HandlerFunc {
 			if i > 0 {
 				whereClause += " OR "
 			}
-			whereClause += "(iata ILIKE $" + fmt.Sprintf("%d", i+1) + " OR name ILIKE $" + fmt.Sprintf("%d", i+1) + " OR city ILIKE $" + fmt.Sprintf("%d", i+1) + ")"
+			whereClause += "(iata ILIKE $" + fmt.Sprintf("%d", i+1) + " OR name ILIKE $" + fmt.Sprintf("%d", i+1) + " OR city ILIKE $" + fmt.Sprintf("%d", i+1) + " OR city_ru ILIKE $" + fmt.Sprintf("%d", i+1) + ")"
 			args = append(args, pattern)
 		}
 		whereClause += ")"
