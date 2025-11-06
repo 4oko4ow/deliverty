@@ -234,28 +234,28 @@ export default function PublishPage() {
             <div className="card p-4 sm:p-6 space-y-5 sm:space-y-6">
                 {/* Publication Type Selection */}
                 <div>
-                    <label className="block text-sm sm:text-sm font-medium text-gray-700 mb-3">
+                    <label className="block text-sm font-medium text-gray-700 mb-3">
                         Тип объявления
                     </label>
-                    <div className="grid grid-cols-2 gap-2 sm:gap-3">
+                    <div className="grid grid-cols-2 gap-3">
                         <button
                             type="button"
                             onClick={() => {
                                 track("publish_kind_changed", { kind: "request" });
                                 setKind("request");
                             }}
-                            className={`p-3 sm:p-4 rounded-lg border-2 transition-all touch-manipulation min-h-[100px] sm:min-h-[120px] ${kind === "request"
+                            className={`p-4 rounded-lg border-2 transition-all touch-manipulation min-h-[110px] ${kind === "request"
                                 ? "border-primary-500 bg-primary-50"
                                 : "border-gray-200 hover:border-gray-300 active:bg-gray-50"
                                 }`}
                         >
-                            <div className="flex flex-col sm:flex-row items-center gap-1.5 sm:gap-2 justify-center mb-2">
-                                <HiOutlineGift className={`w-5 h-5 sm:w-5 sm:h-5 ${kind === "request" ? "text-primary-600" : "text-gray-400"}`} />
-                                <span className={`font-semibold text-sm sm:text-base ${kind === "request" ? "text-primary-900" : "text-gray-600"}`}>
+                            <div className="flex flex-col items-center gap-2 justify-center mb-2">
+                                <HiOutlineGift className={`w-6 h-6 ${kind === "request" ? "text-primary-600" : "text-gray-400"}`} />
+                                <span className={`font-semibold text-base ${kind === "request" ? "text-primary-900" : "text-gray-600"}`}>
                                     Я ищу
                                 </span>
                             </div>
-                            <p className="text-xs sm:text-xs text-gray-500 text-center">
+                            <p className="text-xs text-gray-500 text-center">
                                 Нужна доставка
                             </p>
                         </button>
@@ -265,18 +265,18 @@ export default function PublishPage() {
                                 track("publish_kind_changed", { kind: "trip" });
                                 setKind("trip");
                             }}
-                            className={`p-3 sm:p-4 rounded-lg border-2 transition-all touch-manipulation min-h-[100px] sm:min-h-[120px] ${kind === "trip"
+                            className={`p-4 rounded-lg border-2 transition-all touch-manipulation min-h-[110px] ${kind === "trip"
                                 ? "border-primary-500 bg-primary-50"
                                 : "border-gray-200 hover:border-gray-300 active:bg-gray-50"
                                 }`}
                         >
-                            <div className="flex flex-col sm:flex-row items-center gap-1.5 sm:gap-2 justify-center mb-2">
-                                <HiOutlineTruck className={`w-5 h-5 sm:w-5 sm:h-5 ${kind === "trip" ? "text-primary-600" : "text-gray-400"}`} />
-                                <span className={`font-semibold text-sm sm:text-base ${kind === "trip" ? "text-primary-900" : "text-gray-600"}`}>
+                            <div className="flex flex-col items-center gap-2 justify-center mb-2">
+                                <HiOutlineTruck className={`w-6 h-6 ${kind === "trip" ? "text-primary-600" : "text-gray-400"}`} />
+                                <span className={`font-semibold text-base ${kind === "trip" ? "text-primary-900" : "text-gray-600"}`}>
                                     Я лечу
                                 </span>
                             </div>
-                            <p className="text-xs sm:text-xs text-gray-500 text-center">
+                            <p className="text-xs text-gray-500 text-center">
                                 Могу взять посылку
                             </p>
                         </button>
@@ -291,8 +291,8 @@ export default function PublishPage() {
 
                 {/* Dates */}
                 <div>
-                    <label className="block text-sm sm:text-sm font-medium text-gray-700 mb-2">
-                        <HiOutlineCalendar className="w-4 h-4 sm:w-4 sm:h-4 inline mr-1" />
+                    <label className="block text-sm font-medium text-gray-700 mb-2.5">
+                        <HiOutlineCalendar className="w-4 h-4 inline mr-1.5" />
                         {kind === "trip" ? "Дата полета" : "Период доставки"}
                     </label>
                     {kind === "trip" ? (
@@ -306,9 +306,9 @@ export default function PublishPage() {
                             />
                         </div>
                     ) : (
-                        <div className="grid grid-cols-2 gap-2 sm:gap-3">
+                        <div className="grid grid-cols-2 gap-3">
                             <div>
-                                <label className="block text-xs sm:text-xs text-gray-500 mb-1">Дата начала</label>
+                                <label className="block text-xs text-gray-500 mb-2 font-medium">Дата начала</label>
                                 <input
                                     className="input"
                                     type="date"
@@ -318,7 +318,7 @@ export default function PublishPage() {
                                 />
                             </div>
                             <div>
-                                <label className="block text-xs sm:text-xs text-gray-500 mb-1">Дата окончания</label>
+                                <label className="block text-xs text-gray-500 mb-2 font-medium">Дата окончания</label>
                                 <input
                                     className="input"
                                     type="date"
@@ -333,13 +333,13 @@ export default function PublishPage() {
 
                 {/* Item Details */}
                 <div>
-                    <label className="block text-sm sm:text-sm font-medium text-gray-700 mb-2">
-                        <HiOutlineCube className="w-4 h-4 sm:w-4 sm:h-4 inline mr-1" />
+                    <label className="block text-sm font-medium text-gray-700 mb-2.5">
+                        <HiOutlineCube className="w-4 h-4 inline mr-1.5" />
                         {kind === "request" ? "Характеристики отправления" : "Что могу взять"}
                     </label>
-                    <div className="grid grid-cols-2 gap-2 sm:gap-3">
+                    <div className="grid grid-cols-2 gap-3">
                         <div>
-                            <label className="block text-xs sm:text-xs text-gray-500 mb-1">Тип</label>
+                            <label className="block text-xs text-gray-500 mb-2 font-medium">Тип</label>
                             <select
                                 className="input"
                                 value={item}
@@ -350,7 +350,7 @@ export default function PublishPage() {
                             </select>
                         </div>
                         <div>
-                            <label className="block text-xs sm:text-xs text-gray-500 mb-1">Вес</label>
+                            <label className="block text-xs text-gray-500 mb-2 font-medium">Вес</label>
                             <select
                                 className="input"
                                 value={weight}
@@ -367,11 +367,11 @@ export default function PublishPage() {
 
                 {/* Description */}
                 <div>
-                    <label className="block text-sm sm:text-sm font-medium text-gray-700 mb-2">
+                    <label className="block text-sm font-medium text-gray-700 mb-2.5">
                         Описание
                     </label>
                     <textarea
-                        className="input h-32 sm:h-32 resize-none"
+                        className="input resize-none"
                         placeholder={
                             kind === "request"
                                 ? "Добавьте дополнительные детали о том, что нужно передать. Можно указать желаемое вознаграждение, особые требования, размеры и т.д. Учтите: контакты (телефон, @username, ссылки) запрещены в описании."
@@ -383,27 +383,28 @@ export default function PublishPage() {
                             setError(null);
                         }}
                         maxLength={500}
+                        rows={6}
                     />
-                    <div className="text-xs sm:text-xs text-gray-500 mt-1 text-right">
+                    <div className="text-xs text-gray-500 mt-2 text-right">
                         {desc.length}/500
                     </div>
                 </div>
 
                 {/* Submit Button */}
                 <button
-                    className="btn btn-primary w-full text-base sm:text-base py-4 sm:py-4"
+                    className="btn btn-primary w-full"
                     onClick={submit}
                     disabled={!isFormValid || submitting}
                 >
                     {submitting ? (
                         <>
-                            <div className="w-5 h-5 sm:w-5 sm:h-5 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                            <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin" />
                             Публикация...
                         </>
                     ) : (
                         <>
-                            <HiOutlineSparkles className="w-5 h-5 sm:w-5 sm:h-5" />
-                            <span className="text-sm sm:text-base">{kind === "request" ? "Опубликовать и найти совпадения" : "Опубликовать поездку"}</span>
+                            <HiOutlineSparkles className="w-5 h-5" />
+                            <span>{kind === "request" ? "Опубликовать и найти совпадения" : "Опубликовать поездку"}</span>
                         </>
                     )}
                 </button>

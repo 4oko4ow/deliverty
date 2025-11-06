@@ -176,12 +176,12 @@ export default function AirportInput({
 
   return (
     <div ref={wrapperRef} className="relative">
-      <label className="block text-sm sm:text-sm font-medium text-gray-700 mb-2">
+      <label className="block text-sm font-medium text-gray-700 mb-2.5">
         {label}
       </label>
       <div className="relative">
-        <div className="absolute inset-y-0 left-0 pl-3 sm:pl-3 flex items-center pointer-events-none">
-          <HiOutlineLocationMarker className="w-5 h-5 sm:w-5 sm:h-5 text-gray-400" />
+        <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
+          <HiOutlineLocationMarker className="w-5 h-5 text-gray-400" />
         </div>
         <input
           value={q || getDisplayText()}
@@ -201,27 +201,28 @@ export default function AirportInput({
             }
           }}
           placeholder="Начните вводить название города или аэропорта"
-          className="input pl-10 sm:pl-10 pr-10 sm:pr-10"
+          className="input pl-11 pr-11"
         />
         {value && (
           <button
             onClick={clearSelection}
-            className="absolute inset-y-0 right-0 pr-3 sm:pr-3 flex items-center text-gray-400 hover:text-gray-600 transition-colors touch-manipulation"
+            className="absolute inset-y-0 right-0 pr-4 flex items-center text-gray-400 hover:text-gray-600 active:text-gray-700 transition-colors touch-manipulation"
             aria-label="Очистить"
+            style={{ minWidth: '44px' }}
           >
-            <HiOutlineX className="w-5 h-5 sm:w-5 sm:h-5" />
+            <HiOutlineX className="w-5 h-5" />
           </button>
         )}
       </div>
       
       {showDropdown && (
-        <div className="absolute z-50 w-full mt-1 bg-white border border-gray-200 rounded-lg shadow-strong max-h-60 sm:max-h-60 overflow-auto">
+        <div className="absolute z-50 w-full mt-2 bg-white border border-gray-200 rounded-lg shadow-strong max-h-[280px] overflow-auto">
           {loading ? (
-            <div className="p-4 text-center">
-              <div className="w-5 h-5 sm:w-5 sm:h-5 border-2 border-primary-200 border-t-primary-600 rounded-full animate-spin mx-auto" />
+            <div className="p-5 text-center">
+              <div className="w-6 h-6 border-2 border-primary-200 border-t-primary-600 rounded-full animate-spin mx-auto" />
             </div>
           ) : cityGroups.length === 0 ? (
-            <div className="p-4 text-center text-sm sm:text-sm text-gray-500">
+            <div className="p-5 text-center text-sm text-gray-500">
               Аэропорты не найдены
             </div>
           ) : (
@@ -230,19 +231,19 @@ export default function AirportInput({
                 {/* City option - show if multiple airports */}
                 {group.airports.length > 1 && (
                   <button
-                    className="w-full text-left px-4 py-3.5 sm:py-3 hover:bg-primary-50 active:bg-primary-100 transition-colors border-b border-gray-50 touch-manipulation"
+                    className="w-full text-left px-4 py-4 hover:bg-primary-50 active:bg-primary-100 transition-colors border-b border-gray-50 touch-manipulation min-h-[56px]"
                     onClick={() => handleSelectCity(group.city, group.country, group.airports)}
                   >
-                    <div className="flex items-center justify-between gap-2">
+                    <div className="flex items-center justify-between gap-3">
                       <div className="flex-1 min-w-0">
-                        <div className="font-semibold text-primary-700 text-base sm:text-sm truncate">
+                        <div className="font-semibold text-primary-700 text-base truncate">
                           {group.city}, {group.country}
                         </div>
-                        <div className="text-xs sm:text-xs text-primary-600 truncate">
+                        <div className="text-xs text-primary-600 truncate mt-0.5">
                           Любой аэропорт ({group.airports.length} {group.airports.length === 1 ? 'аэропорт' : group.airports.length < 5 ? 'аэропорта' : 'аэропортов'})
                         </div>
                       </div>
-                      <HiOutlineSearch className="w-4 h-4 sm:w-4 sm:h-4 text-primary-500 flex-shrink-0" />
+                      <HiOutlineSearch className="w-5 h-5 text-primary-500 flex-shrink-0" />
                     </div>
                   </button>
                 )}
@@ -250,15 +251,15 @@ export default function AirportInput({
                 {group.airports.map((airport) => (
                   <button
                     key={airport.IATA}
-                    className="w-full text-left px-4 py-3.5 sm:py-3 hover:bg-gray-50 active:bg-gray-100 transition-colors border-b border-gray-50 last:border-0 touch-manipulation pl-8"
+                    className="w-full text-left px-4 py-4 hover:bg-gray-50 active:bg-gray-100 transition-colors border-b border-gray-50 last:border-0 touch-manipulation pl-8 min-h-[56px]"
                     onClick={() => handleSelectAirport(airport)}
                   >
-                    <div className="flex items-center justify-between gap-2">
+                    <div className="flex items-center justify-between gap-3">
                       <div className="flex-1 min-w-0">
-                        <div className="font-semibold text-gray-900 text-base sm:text-sm truncate">{airport.IATA}</div>
-                        <div className="text-sm sm:text-sm text-gray-600 truncate">{airport.Name}</div>
+                        <div className="font-semibold text-gray-900 text-base truncate">{airport.IATA}</div>
+                        <div className="text-sm text-gray-600 truncate mt-0.5">{airport.Name}</div>
                       </div>
-                      <HiOutlineSearch className="w-4 h-4 sm:w-4 sm:h-4 text-gray-400 flex-shrink-0" />
+                      <HiOutlineSearch className="w-5 h-5 text-gray-400 flex-shrink-0" />
                     </div>
                   </button>
                 ))}
@@ -269,9 +270,9 @@ export default function AirportInput({
       )}
       
       {value && !q && (
-        <div className="mt-2 flex items-center gap-2 text-sm sm:text-sm">
+        <div className="mt-2.5 flex items-center gap-2">
           <span className="badge-primary">
-            <HiOutlineLocationMarker className="w-3 h-3 sm:w-3 sm:h-3" />
+            <HiOutlineLocationMarker className="w-3.5 h-3.5" />
             {value}
           </span>
         </div>

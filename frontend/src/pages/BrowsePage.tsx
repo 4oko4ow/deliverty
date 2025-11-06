@@ -494,22 +494,22 @@ export default function BrowsePage() {
 
         {/* Filter by kind */}
         <div>
-          <label className="block text-sm sm:text-sm font-medium text-gray-700 mb-2">
+          <label className="block text-sm font-medium text-gray-700 mb-2.5">
             Я
           </label>
-          <div className="grid grid-cols-2 gap-2">
+          <div className="grid grid-cols-2 gap-3">
             <button
               type="button"
               onClick={() => {
                 track("filter_changed", { filter: "request", from_iata: from, to_iata: to });
                 setKindFilter("request");
               }}
-              className={`px-3 py-3 sm:px-4 sm:py-3 rounded-lg border-2 transition-all text-sm sm:text-base flex items-center justify-center gap-2 touch-manipulation min-h-[56px] ${kindFilter === "request"
+              className={`px-4 py-4 rounded-lg border-2 transition-all text-base flex items-center justify-center gap-2 touch-manipulation min-h-[56px] ${kindFilter === "request"
                 ? "border-primary-500 bg-primary-50 text-primary-900 font-semibold"
                 : "border-gray-200 hover:border-gray-300 active:bg-gray-50 text-gray-700"
                 }`}
             >
-              <HiOutlineGift className="w-5 h-5 sm:w-5 sm:h-5 flex-shrink-0" />
+              <HiOutlineGift className="w-5 h-5 flex-shrink-0" />
               <span>ищу</span>
             </button>
             <button
@@ -518,12 +518,12 @@ export default function BrowsePage() {
                 track("filter_changed", { filter: "trip", from_iata: from, to_iata: to });
                 setKindFilter("trip");
               }}
-              className={`px-3 py-3 sm:px-4 sm:py-3 rounded-lg border-2 transition-all text-sm sm:text-base flex items-center justify-center gap-2 touch-manipulation min-h-[56px] ${kindFilter === "trip"
+              className={`px-4 py-4 rounded-lg border-2 transition-all text-base flex items-center justify-center gap-2 touch-manipulation min-h-[56px] ${kindFilter === "trip"
                 ? "border-primary-500 bg-primary-50 text-primary-900 font-semibold"
                 : "border-gray-200 hover:border-gray-300 active:bg-gray-50 text-gray-700"
                 }`}
             >
-              <HiOutlineTruck className="w-5 h-5 sm:w-5 sm:h-5 flex-shrink-0" />
+              <HiOutlineTruck className="w-5 h-5 flex-shrink-0" />
               <span>лечу</span>
             </button>
           </div>
@@ -637,7 +637,7 @@ export default function BrowsePage() {
                 {rows.map((r, idx) => (
                   <div
                     key={r.id}
-                    className="card-hover p-4 sm:p-5 animate-slide-up touch-manipulation"
+                    className="card-hover p-5 animate-slide-up touch-manipulation"
                     style={{ animationDelay: `${idx * 50}ms` }}
                   >
                     <div className="flex items-start justify-between mb-3">
@@ -706,7 +706,7 @@ export default function BrowsePage() {
 
                     <div className="flex items-center justify-end pt-4 border-t border-gray-100">
                       <button
-                        className="btn btn-primary text-xs sm:text-sm px-4 py-2"
+                        className="btn btn-primary"
                         onClick={async () => {
                           track("request_contacts_clicked", {
                             pub_id: r.id,

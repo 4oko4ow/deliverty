@@ -6,28 +6,77 @@
   body {
     @apply bg-gradient-to-br from-gray-50 via-white to-blue-50/30 min-h-screen;
     font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen', 'Ubuntu', 'Cantarell', 'Fira Sans', 'Droid Sans', 'Helvetica Neue', sans-serif;
+    /* Улучшенная типографика для мобильных */
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+  }
+  
+  /* Предотвращение выделения текста при тапе на мобильных */
+  button, a {
+    -webkit-tap-highlight-color: transparent;
+    user-select: none;
+  }
+  
+  /* Улучшение для input на iOS */
+  input, select, textarea {
+    -webkit-appearance: none;
+    border-radius: 0.5rem;
   }
 }
 
 @layer components {
   .input {
-    @apply w-full border border-gray-200 rounded-lg px-4 py-3.5 text-base
-           bg-white transition-all duration-200
+    @apply w-full border border-gray-200 rounded-lg bg-white transition-all duration-200
            focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent
-           placeholder:text-gray-400
-           sm:px-4 sm:py-3 sm:text-sm;
-    /* Увеличиваем размер для мобильных для лучшего UX */
-    min-height: 48px; /* Минимальный размер для удобного тапа */
+           placeholder:text-gray-400;
+    /* Мобильные стили - увеличенные для удобства тапа */
+    padding: 14px 16px;
+    font-size: 16px; /* Минимум 16px чтобы избежать авто-зума на iOS */
+    line-height: 1.5;
+    min-height: 52px; /* Увеличенный размер для удобного тапа */
+    /* Десктоп стили */
+    @media (min-width: 640px) {
+      padding: 12px 16px;
+      font-size: 14px;
+      min-height: 44px;
+    }
+  }
+
+  /* Специальные стили для селектов */
+  select.input {
+    appearance: none;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 20 20'%3E%3Cpath stroke='%236b7280' stroke-linecap='round' stroke-linejoin='round' stroke-width='1.5' d='M6 8l4 4 4-4'/%3E%3C/svg%3E");
+    background-repeat: no-repeat;
+    background-position: right 16px center;
+    background-size: 20px;
+    padding-right: 48px;
+    cursor: pointer;
+  }
+
+  /* Стили для textarea */
+  textarea.input {
+    min-height: 120px;
+    resize: vertical;
+    @media (min-width: 640px) {
+      min-height: 100px;
+    }
   }
 
   .btn {
-    @apply inline-flex items-center justify-center gap-2 px-5 py-3.5 rounded-lg 
-           text-base font-medium transition-all duration-200
+    @apply inline-flex items-center justify-center gap-2 rounded-lg 
+           font-medium transition-all duration-200
            disabled:opacity-50 disabled:cursor-not-allowed
-           focus:outline-none focus:ring-2 focus:ring-offset-2
-           sm:px-4 sm:py-3 sm:text-sm;
-    /* Увеличиваем размер для мобильных */
-    min-height: 48px; /* Минимальный размер для удобного тапа */
+           focus:outline-none focus:ring-2 focus:ring-offset-2;
+    /* Мобильные стили - увеличенные для удобства тапа */
+    padding: 14px 20px;
+    font-size: 16px; /* Минимум 16px для лучшей читаемости */
+    min-height: 52px; /* Увеличенный размер для удобного тапа */
+    /* Десктоп стили */
+    @media (min-width: 640px) {
+      padding: 12px 16px;
+      font-size: 14px;
+      min-height: 44px;
+    }
   }
 
   .btn-primary {
@@ -54,10 +103,8 @@
 
   .card {
     @apply bg-white rounded-xl border border-gray-100 shadow-soft
-           hover:shadow-medium transition-all duration-200
-           sm:rounded-xl;
-    /* Адаптивные скругления */
-    border-radius: 0.75rem; /* 12px для мобильных */
+           hover:shadow-medium transition-all duration-200;
+    /* Улучшенные отступы для мобильных, дефолтные отступы через классы */
   }
 
   .card-hover {
@@ -65,10 +112,15 @@
   }
 
   .badge {
-    @apply inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-medium
-           sm:text-xs;
-    /* Адаптивный размер текста для мобильных */
-    font-size: 0.75rem; /* 12px для мобильных */
+    @apply inline-flex items-center gap-1 rounded-full font-medium;
+    /* Мобильные стили */
+    padding: 6px 10px;
+    font-size: 13px; /* Немного больше для мобильных */
+    /* Десктоп стили */
+    @media (min-width: 640px) {
+      padding: 4px 10px;
+      font-size: 12px;
+    }
   }
 
   .badge-primary {
