@@ -688,21 +688,33 @@ func requestContacts(pool *pgxpool.Pool) gin.HandlerFunc {
 func getPopularRoutes(pool *pgxpool.Pool) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		// Get popular routes with count of active publications
-		// Group by from_iata and to_iata, count publications
-		// Order by count descending, limit to top 10
-		// Use MAX() to get first non-NULL city name for each route
+		// Group by cities (not IATA codes) to match search behavior
+		// This ensures routes like SVO->MCX and DME->MCX are combined as "Москва -> Махачкала"
+		// Use city_ru if available, otherwise use city (matching the search logic)
 		qry := `
+		  WITH route_cities AS (
+		    SELECT 
+		      p.from_iata,
+		      p.to_iata,
+		      COALESCE(a_from.city_ru, a_from.city) as from_city,
+		      COALESCE(a_to.city_ru, a_to.city) as to_city,
+		      COALESCE(a_from.city_ru, a_from.city, a_from.name) as from_city_display,
+		      COALESCE(a_to.city_ru, a_to.city, a_to.name) as to_city_display
+		    FROM publication p
+		    LEFT JOIN airport a_from ON a_from.iata = p.from_iata
+		    LEFT JOIN airport a_to ON a_to.iata = p.to_iata
+		    WHERE p.is_active
+		      AND (a_from.city_ru IS NOT NULL OR a_from.city IS NOT NULL)
+		      AND (a_to.city_ru IS NOT NULL OR a_to.city IS NOT NULL)
+		  )
 		  SELECT 
-		    p.from_iata,
-		    p.to_iata,
+		    MAX(from_iata) as from_iata,
+		    MAX(to_iata) as to_iata,
 		    COUNT(*) as count,
-		    MAX(COALESCE(a_from.city_ru, a_from.city, a_from.name)) as from_city,
-		    MAX(COALESCE(a_to.city_ru, a_to.city, a_to.name)) as to_city
-		  FROM publication p
-		  LEFT JOIN airport a_from ON a_from.iata = p.from_iata
-		  LEFT JOIN airport a_to ON a_to.iata = p.to_iata
-		  WHERE p.is_active
-		  GROUP BY p.from_iata, p.to_iata
+		    MAX(from_city_display) as from_city,
+		    MAX(to_city_display) as to_city
+		  FROM route_cities
+		  GROUP BY from_city, to_city
 		  HAVING COUNT(*) > 0
 		  ORDER BY count DESC
 		  LIMIT 10`
