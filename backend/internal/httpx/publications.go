@@ -36,6 +36,7 @@ func RegisterPublicationRoutes(g *gin.RouterGroup, pool *pgxpool.Pool) {
 	g.POST("/publications", RateLimit(20), createPublication(pool))
 	g.GET("/publications", listPublications(pool))
 	g.GET("/publications/:id", getPublication(pool))
+	g.GET("/publications/popular-routes", getPopularRoutes(pool))
 }
 
 // RegisterPublicationAuthRoutes registers auth-required publication routes
@@ -681,6 +682,64 @@ func requestContacts(pool *pgxpool.Pool) gin.HandlerFunc {
 			"username":   ownerUsername,
 			"tg_user_id": ownerTGID,
 		})
+	}
+}
+
+func getPopularRoutes(pool *pgxpool.Pool) gin.HandlerFunc {
+	return func(c *gin.Context) {
+		// Get popular routes with count of active publications
+		// Group by from_iata and to_iata, count publications
+		// Order by count descending, limit to top 10
+		qry := `
+		  SELECT 
+		    p.from_iata,
+		    p.to_iata,
+		    COUNT(*) as count,
+		    COALESCE(a_from.city_ru, a_from.city, a_from.name) as from_city,
+		    COALESCE(a_to.city_ru, a_to.city, a_to.name) as to_city
+		  FROM publication p
+		  LEFT JOIN airport a_from ON a_from.iata = p.from_iata
+		  LEFT JOIN airport a_to ON a_to.iata = p.to_iata
+		  WHERE p.is_active
+		  GROUP BY p.from_iata, p.to_iata, a_from.city_ru, a_from.city, a_from.name, a_to.city_ru, a_to.city, a_to.name
+		  HAVING COUNT(*) > 0
+		  ORDER BY count DESC
+		  LIMIT 10`
+
+		rows, err := pool.Query(c, qry)
+		if err != nil {
+			log.Printf("[PUBLICATIONS] Popular routes query error: %v", err)
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "ошибка базы данных"})
+			return
+		}
+		defer rows.Close()
+
+		type Route struct {
+			FromIATA string `json:"from_iata"`
+			ToIATA   string `json:"to_iata"`
+			Count    int    `json:"count"`
+			FromCity string `json:"from_city"`
+			ToCity   string `json:"to_city"`
+		}
+
+		out := []Route{}
+
+		for rows.Next() {
+			var r Route
+			if err := rows.Scan(&r.FromIATA, &r.ToIATA, &r.Count, &r.FromCity, &r.ToCity); err != nil {
+				log.Printf("[PUBLICATIONS] Popular routes scan error: %v", err)
+				continue
+			}
+			out = append(out, r)
+		}
+
+		if err := rows.Err(); err != nil {
+			log.Printf("[PUBLICATIONS] Popular routes rows error: %v", err)
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "ошибка базы данных"})
+			return
+		}
+
+		c.JSON(http.StatusOK, out)
 	}
 }
 

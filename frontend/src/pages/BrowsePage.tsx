@@ -22,6 +22,7 @@ export default function BrowsePage() {
   const [error, setError] = useState<string | null>(null);
   const [creating, setCreating] = useState<number | null>(null);
   const [telegramLink, setTelegramLink] = useState<string | null>(null);
+  const [popularRoutes, setPopularRoutes] = useState<any[]>([]);
 
   // Helper function to track events
   const track = (eventName: string, properties?: Record<string, any>) => {
@@ -41,6 +42,21 @@ export default function BrowsePage() {
       posthog.capture("browse_page_viewed");
     }
   }, [posthog]); // Track when PostHog is ready
+
+  // Load popular routes
+  useEffect(() => {
+    async function loadPopularRoutes() {
+      try {
+        const routes: any = await api.getPopularRoutes();
+        if (Array.isArray(routes)) {
+          setPopularRoutes(routes);
+        }
+      } catch (err) {
+        console.error("Failed to load popular routes:", err);
+      }
+    }
+    loadPopularRoutes();
+  }, []);
 
   // Restore search state after login
   useEffect(() => {
@@ -492,6 +508,92 @@ export default function BrowsePage() {
         <div className="text-center space-y-2">
           <h1 className="text-2xl sm:text-3xl font-bold text-gray-900">Поиск</h1>
         </div>
+
+        {/* Popular routes */}
+        {!searched && popularRoutes.length > 0 && (
+          <div className="card p-4 sm:p-6">
+            <h2 className="text-sm font-medium text-gray-700 mb-3">Популярные направления</h2>
+            <div className="flex flex-wrap gap-2">
+              {popularRoutes.map((route, idx) => (
+                <button
+                  key={`${route.from_iata}-${route.to_iata}-${idx}`}
+                  type="button"
+                  onClick={async () => {
+                    track("popular_route_clicked", {
+                      from_iata: route.from_iata,
+                      to_iata: route.to_iata,
+                      count: route.count,
+                    });
+                    setFrom(route.from_iata);
+                    setTo(route.to_iata);
+                    // Trigger search automatically
+                    setError(null);
+                    setLoading(true);
+                    setSearched(true);
+
+                    track("search_started", {
+                      from_iata: route.from_iata,
+                      to_iata: route.to_iata,
+                      kind_filter: kindFilter,
+                      source: "popular_route",
+                    });
+
+                    try {
+                      let searchKind: string | undefined;
+                      if (kindFilter === "request") {
+                        searchKind = "trip";
+                      } else if (kindFilter === "trip") {
+                        searchKind = "request";
+                      }
+
+                      const result: any = await api.listPubs(route.from_iata, route.to_iata, searchKind);
+                      if (Array.isArray(result)) {
+                        setRows(result);
+                        track("search_completed", {
+                          from_iata: route.from_iata,
+                          to_iata: route.to_iata,
+                          kind_filter: kindFilter,
+                          results_count: result.length,
+                          source: "popular_route",
+                        });
+
+                        if (result.length > 0) {
+                          track("search_results_viewed", {
+                            from_iata: route.from_iata,
+                            to_iata: route.to_iata,
+                            kind_filter: kindFilter,
+                            results_count: result.length,
+                            source: "popular_route",
+                          });
+                        }
+                      } else if (result && typeof result === "object" && "error" in result) {
+                        setError(result.error || "Ошибка при поиске");
+                        setRows([]);
+                      } else {
+                        setRows([]);
+                      }
+                    } catch (err) {
+                      setError("Произошла ошибка при поиске. Попробуйте еще раз.");
+                      setRows([]);
+                      track("search_error", {
+                        from_iata: route.from_iata,
+                        to_iata: route.to_iata,
+                        kind_filter: kindFilter,
+                        error: String(err),
+                        source: "popular_route",
+                      });
+                    } finally {
+                      setLoading(false);
+                    }
+                  }}
+                  className="px-3 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 hover:border-gray-400 active:bg-gray-100 transition-colors touch-manipulation"
+                >
+                  {route.from_city || route.from_iata} → {route.to_city || route.to_iata} ({route.count})
+                </button>
+              ))}
+            </div>
+          </div>
+        )}
 
         <div className="card p-4 sm:p-6 space-y-4">
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">

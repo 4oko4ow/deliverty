@@ -130,4 +130,9 @@ export const api = {
     });
     return handleResponse(response);
   },
+
+  getPopularRoutes: async () => {
+    const response = await fetch(`${BASE}/publications/popular-routes`);
+    return handleResponse(response);
+  },
 };

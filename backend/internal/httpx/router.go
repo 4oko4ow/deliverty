@@ -28,6 +28,7 @@ func RegisterRoutes(r *gin.Engine, pool *pgxpool.Pool) {
 		// Public routes (no auth required)
 		api.GET("/publications", listPublications(pool))
 		api.GET("/publications/:id", getPublication(pool))
+		api.GET("/publications/popular-routes", getPopularRoutes(pool))
 		api.GET("/matches", findMatches(pool))
 
 		// Auth required routes
