@@ -157,9 +157,9 @@ function App() {
         <Route
           path="/*"
           element={
-            <div className="min-h-screen pb-20 sm:pb-0">
+            <div className="min-h-screen flex flex-col pb-20 sm:pb-0">
               <Header />
-              <main className="max-w-4xl mx-auto px-4 py-6 sm:py-8">
+              <main className="flex-1 max-w-4xl mx-auto w-full px-4 py-6 sm:py-8">
                 <Routes>
                   <Route path="/" element={<BrowsePage />} />
                   <Route path="/publish" element={<PublishPage />} />

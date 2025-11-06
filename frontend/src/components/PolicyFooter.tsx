@@ -7,7 +7,7 @@ export default function PolicyFooter() {
   const policyText = `Разрешено: документы, мелкие законные предметы. Запрещено: наличные, алкоголь, вейпы, наркотики, оружие, опасные/биологические материалы, SIM/кредитные карты или что-либо незаконное. Передача только в публичных зонах аэропорта. Сервис является платформой объявлений, а не перевозчиком.`;
 
   return (
-    <footer className="max-w-4xl mx-auto px-4 mt-12 pt-6 pb-20 sm:pb-6 border-t border-gray-200">
+    <footer className="max-w-4xl mx-auto w-full px-4 pt-6 pb-20 sm:pb-6 border-t border-gray-200 mt-auto">
       <button
         onClick={() => setShow(!show)}
         className="flex items-center gap-2 text-sm text-gray-600 hover:text-gray-900 transition-colors"
