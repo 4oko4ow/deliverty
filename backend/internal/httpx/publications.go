@@ -690,18 +690,19 @@ func getPopularRoutes(pool *pgxpool.Pool) gin.HandlerFunc {
 		// Get popular routes with count of active publications
 		// Group by from_iata and to_iata, count publications
 		// Order by count descending, limit to top 10
+		// Use MAX() to get first non-NULL city name for each route
 		qry := `
 		  SELECT 
 		    p.from_iata,
 		    p.to_iata,
 		    COUNT(*) as count,
-		    COALESCE(a_from.city_ru, a_from.city, a_from.name) as from_city,
-		    COALESCE(a_to.city_ru, a_to.city, a_to.name) as to_city
+		    MAX(COALESCE(a_from.city_ru, a_from.city, a_from.name)) as from_city,
+		    MAX(COALESCE(a_to.city_ru, a_to.city, a_to.name)) as to_city
 		  FROM publication p
 		  LEFT JOIN airport a_from ON a_from.iata = p.from_iata
 		  LEFT JOIN airport a_to ON a_to.iata = p.to_iata
 		  WHERE p.is_active
-		  GROUP BY p.from_iata, p.to_iata, a_from.city_ru, a_from.city, a_from.name, a_to.city_ru, a_to.city, a_to.name
+		  GROUP BY p.from_iata, p.to_iata
 		  HAVING COUNT(*) > 0
 		  ORDER BY count DESC
 		  LIMIT 10`
