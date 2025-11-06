@@ -84,8 +84,14 @@ export default function AirportInput({
     let cancelled = false;
     api.airports(q).then((x) => {
       if (!cancelled) {
-        setAirports(Array.isArray(x) ? x : []);
-        setShowDropdown(true);
+        const results = Array.isArray(x) ? x : [];
+        setAirports(results);
+        // Show dropdown if we have results
+        if (results.length > 0) {
+          setShowDropdown(true);
+        } else {
+          setShowDropdown(false);
+        }
         setLoading(false);
       }
     }).catch(() => {
@@ -215,8 +221,8 @@ export default function AirportInput({
         )}
       </div>
       
-      {showDropdown && (
-        <div className="absolute z-50 w-full mt-2 bg-white border border-gray-200 rounded-lg shadow-strong max-h-[280px] overflow-auto">
+      {(showDropdown || loading) && (
+        <div className="absolute z-[100] w-full mt-2 bg-white border border-gray-200 rounded-lg shadow-strong max-h-[280px] overflow-auto">
           {loading ? (
             <div className="p-5 text-center">
               <div className="w-6 h-6 border-2 border-primary-200 border-t-primary-600 rounded-full animate-spin mx-auto" />
