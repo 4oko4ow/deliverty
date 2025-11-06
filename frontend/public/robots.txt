@@ -1,0 +1,8 @@
+User-agent: *
+Allow: /
+Disallow: /api/
+Disallow: /bot/
+
+# Sitemap
+Sitemap: https://deliverty.app/sitemap.xml
+

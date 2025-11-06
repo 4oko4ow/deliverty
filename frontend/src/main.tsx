@@ -3,6 +3,7 @@ import { createRoot } from "react-dom/client";
 import { BrowserRouter, Routes, Route, Link, useLocation } from "react-router-dom";
 import { HiOutlinePaperAirplane, HiOutlinePlusCircle, HiOutlineSearch, HiOutlineUser } from "react-icons/hi";
 import { PostHogProvider, usePostHog } from "posthog-js/react";
+import { HelmetProvider } from "react-helmet-async";
 import "./index.css";
 import PublishPage from "./pages/PublishPage";
 import BrowsePage from "./pages/BrowsePage";
@@ -183,13 +184,15 @@ const options = {
 
 const root = createRoot(document.getElementById("root")!);
 
-// Wrap app with PostHogProvider if API key is provided
+// Wrap app with HelmetProvider and PostHogProvider if API key is provided
 if (POSTHOG_KEY) {
   root.render(
     <StrictMode>
-      <PostHogProvider apiKey={POSTHOG_KEY} options={options}>
-        <App />
-      </PostHogProvider>
+      <HelmetProvider>
+        <PostHogProvider apiKey={POSTHOG_KEY} options={options}>
+          <App />
+        </PostHogProvider>
+      </HelmetProvider>
     </StrictMode>
   );
 } else {
@@ -198,7 +201,9 @@ if (POSTHOG_KEY) {
   }
   root.render(
     <StrictMode>
-      <App />
+      <HelmetProvider>
+        <App />
+      </HelmetProvider>
     </StrictMode>
   );
 }
