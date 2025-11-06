@@ -135,4 +135,16 @@ export const api = {
     const response = await fetch(`${BASE}/publications/popular-routes`);
     return handleResponse(response);
   },
+
+  createAdminPub: async (body: any): Promise<CreatePubResponse> => {
+    const response = await fetch(`${BASE}/admin/publications`, {
+      method: "POST",
+      headers: { 
+        "Content-Type": "application/json", 
+        ...tgHeader() 
+      },
+      body: JSON.stringify(body),
+    });
+    return handleResponse<CreatePubResponse>(response);
+  },
 };

@@ -11,6 +11,8 @@
 | `TG_BOT_NAME` | ✅ **Required** | Telegram bot username (without @) | `deliverty_bot` |
 | `TG_DEEPLINK_SECRET` | ✅ **Required** | Random secret string for deep link signing | `your-random-secret-string-here` |
 | `FRONTEND_URL` | ⚠️ **Recommended** | Frontend URL for auth redirects (auto-detected from Referer if not set) | `https://your-project.vercel.app` |
+| `ADMIN_SECRET_KEY` | ❌ Optional | Secret key for admin endpoints (for manually adding publications via API) | `your-admin-secret-key` |
+| `ADMIN_USER_IDS` | ❌ Optional | Comma-separated list of Telegram user IDs for admin access (for web interface) | `123456789,987654321` |
 | `HTTP_ADDR` | ❌ Optional | Server address (defaults to `:8080` or uses `PORT`) | `:8080` |
 | `PORT` | ❌ Optional | Render/Heroku standard (auto-set by Render) | `10000` |
 
@@ -38,6 +40,7 @@ TG_BOT_TOKEN=123456:ABC-your-bot-token
 TG_BOT_NAME=deliverty_bot
 TG_DEEPLINK_SECRET=your-random-secret-string-here
 FRONTEND_URL=https://your-project.vercel.app
+ADMIN_SECRET_KEY=your-admin-secret-key-here  # Optional: for admin endpoints
 ```
 
 **How to get Session Pooler URL:**
@@ -106,6 +109,94 @@ For Telegram Login Widget to work in production:
 
 **For local development**:
 - Use a tunnel service (ngrok, localtunnel) or skip auth (uses fallback user ID in dev mode)
+
+## Admin Endpoints
+
+Для раннего релиза доступен админ-эндпоинт для ручного добавления объявлений от имени других пользователей.
+
+### Настройка
+
+1. **Для веб-интерфейса** (рекомендуется): Установите переменную окружения `ADMIN_USER_IDS` со списком ваших Telegram user ID:
+   ```bash
+   ADMIN_USER_IDS=123456789,987654321
+   ```
+   После этого вы сможете зайти на `/admin` через веб-интерфейс, авторизовавшись через Telegram.
+
+2. **Для API-доступа**: Установите переменную окружения `ADMIN_SECRET_KEY`:
+   ```bash
+   ADMIN_SECRET_KEY=your-secret-key-here
+   ```
+   Рекомендуется сгенерировать случайный ключ:
+   ```bash
+   openssl rand -hex 32
+   ```
+   Используйте этот ключ в заголовке `X-Admin-Key` при вызове админ-эндпоинтов.
+
+**Примечание**: Можно использовать оба способа одновременно. Доступ будет предоставлен, если пройдена хотя бы одна проверка.
+
+### Создание публикации от имени другого пользователя
+
+**Endpoint**: `POST /api/admin/publications`
+
+**Headers**:
+- `X-Admin-Key`: ваш секретный ключ
+- `Content-Type`: `application/json`
+
+**Body** (JSON):
+```json
+{
+  "kind": "request",  // или "trip"
+  "from_iata": "SVO",
+  "to_iata": "JFK",
+  "date_start": "2024-12-20",  // для request
+  "date_end": "2024-12-25",    // для request
+  "date": "2024-12-22",        // для trip (вместо date_start/date_end)
+  "item": "documents",         // или "small"
+  "weight": "envelope",        // или "le1kg", "le3kg"
+  "reward_hint": 1000,         // опционально
+  "description": "Описание объявления",
+  "flight_no": "SU100",        // опционально, для trip
+  "airline": "Aeroflot",       // опционально, для trip
+  "capacity_hint": "envelope/1kg",  // опционально, для trip
+  
+  // Один из этих полей обязателен для указания пользователя:
+  "tg_user_id": 123456789,     // Telegram user ID
+  "tg_username": "username"    // или Telegram username (без @)
+}
+```
+
+**Пример запроса**:
+```bash
+curl -X POST https://your-api.onrender.com/api/admin/publications \
+  -H "X-Admin-Key: your-secret-key-here" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "kind": "request",
+    "from_iata": "SVO",
+    "to_iata": "JFK",
+    "date_start": "2024-12-20",
+    "date_end": "2024-12-25",
+    "item": "documents",
+    "weight": "envelope",
+    "description": "Нужно доставить документы",
+    "tg_username": "external_user"
+  }'
+```
+
+**Особенности**:
+- Админ-эндпоинт обходит ограничения (5 активных публикаций, проверка дубликатов)
+- Если пользователь с указанным `tg_username` не существует, он будет создан автоматически
+- Если указан только `tg_username` без `tg_user_id`, для внешних пользователей будет создан специальный отрицательный ID
+
+### Веб-интерфейс
+
+Доступен по адресу `/admin` после авторизации через Telegram (если ваш `tg_user_id` указан в `ADMIN_USER_IDS`).
+
+**Важно о регистрации пользователей**:
+- Если вы создали публикацию от имени пользователя с `tg_username` (без `tg_user_id`), для него будет создан пользователь с отрицательным ID
+- Когда реальный пользователь с таким же `tg_username` зарегистрируется в системе, он создаст нового пользователя с реальным `tg_user_id`
+- Публикации останутся привязанными к старому пользователю с отрицательным ID
+- **Рекомендация**: Используйте реальный `tg_user_id`, если он известен, или используйте уникальные `tg_username` для внешних пользователей (например, `external_user_1`, `external_user_2`)
 
 ## Local Development
 

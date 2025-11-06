@@ -4,7 +4,7 @@ import UserRating from "../components/UserRating";
 import SEO from "../components/SEO";
 import { api, isAuthenticated } from "../lib/api";
 import { useNavigate } from "react-router-dom";
-import { HiOutlineSearch, HiOutlineLocationMarker, HiOutlineCalendar, HiOutlineCube, HiArrowRight, HiOutlineExclamationCircle, HiOutlineCheckCircle } from "react-icons/hi";
+import { HiOutlineSearch, HiOutlineLocationMarker, HiOutlineCalendar, HiOutlineCube, HiArrowRight, HiOutlineExclamationCircle, HiOutlineCheckCircle, HiX } from "react-icons/hi";
 import { HiOutlineTruck, HiOutlineGift } from "react-icons/hi2";
 import { FaTelegram } from "react-icons/fa";
 import { formatItem, formatWeight } from "../lib/translations";
@@ -536,92 +536,6 @@ export default function BrowsePage() {
           <h1 className="text-2xl sm:text-3xl font-bold text-gray-900">Поиск</h1>
         </div>
 
-        {/* Popular routes */}
-        {!searched && popularRoutes.length > 0 && (
-          <div className="card p-4 sm:p-6">
-            <h2 className="text-sm font-medium text-gray-700 mb-3">Популярные направления</h2>
-            <div className="flex flex-wrap gap-2">
-              {popularRoutes.map((route, idx) => (
-                <button
-                  key={`${route.from_iata}-${route.to_iata}-${idx}`}
-                  type="button"
-                  onClick={async () => {
-                    track("popular_route_clicked", {
-                      from_iata: route.from_iata,
-                      to_iata: route.to_iata,
-                      from_city: route.from_city || route.from_iata,
-                      to_city: route.to_city || route.to_iata,
-                      publications_count: route.count,
-                      current_kind_filter: kindFilter,
-                    });
-                    setFrom(route.from_iata);
-                    setTo(route.to_iata);
-                    // Trigger search automatically
-                    setError(null);
-                    setLoading(true);
-                    setSearched(true);
-
-                    track("search_started", {
-                      from_iata: route.from_iata,
-                      to_iata: route.to_iata,
-                      kind_filter: "all",
-                      source: "popular_route",
-                    });
-
-                    try {
-                      // Show all types when clicking popular route
-                      const result: any = await api.listPubs(route.from_iata, route.to_iata, undefined);
-                      if (Array.isArray(result)) {
-                        setRows(result);
-                        track("search_completed", {
-                          from_iata: route.from_iata,
-                          to_iata: route.to_iata,
-                          kind_filter: "all",
-                          results_count: result.length,
-                          source: "popular_route",
-                        });
-
-                        if (result.length > 0) {
-                          track("search_results_viewed", {
-                            from_iata: route.from_iata,
-                            to_iata: route.to_iata,
-                            kind_filter: "all",
-                            results_count: result.length,
-                            source: "popular_route",
-                          });
-                        }
-                      } else if (result && typeof result === "object" && "error" in result) {
-                        setError(result.error || "Ошибка при поиске");
-                        setRows([]);
-                      } else {
-                        setRows([]);
-                      }
-                    } catch (err) {
-                      setError("Произошла ошибка при поиске. Попробуйте еще раз.");
-                      setRows([]);
-                      track("search_error", {
-                        from_iata: route.from_iata,
-                        to_iata: route.to_iata,
-                        kind_filter: "all",
-                        error: String(err),
-                        source: "popular_route",
-                      });
-                    } finally {
-                      setLoading(false);
-                    }
-                  }}
-                  className="px-3 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 hover:border-gray-400 active:bg-gray-100 transition-colors touch-manipulation flex items-center gap-1.5"
-                >
-                  <span>{route.from_city || route.from_iata} → {route.to_city || route.to_iata}</span>
-                  <span className="px-1.5 py-0.5 bg-blue-100 text-blue-700 rounded font-semibold text-xs">
-                    {route.count}
-                  </span>
-                </button>
-              ))}
-            </div>
-          </div>
-        )}
-
         <div className="card p-4 sm:p-6 space-y-4">
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <AirportInput label="Откуда" value={from} onChange={setFrom} />
@@ -717,8 +631,112 @@ export default function BrowsePage() {
           )}
         </div>
 
+        {/* Popular routes - shown after search form */}
+        {!searched && popularRoutes.length > 0 && (
+          <div className="card p-4 sm:p-6">
+            <h2 className="text-sm font-medium text-gray-700 mb-3">Популярные направления</h2>
+            <div className="flex flex-wrap gap-2">
+              {popularRoutes.map((route, idx) => (
+                <button
+                  key={`${route.from_iata}-${route.to_iata}-${idx}`}
+                  type="button"
+                  onClick={async () => {
+                    track("popular_route_clicked", {
+                      from_iata: route.from_iata,
+                      to_iata: route.to_iata,
+                      from_city: route.from_city || route.from_iata,
+                      to_city: route.to_city || route.to_iata,
+                      publications_count: route.count,
+                      current_kind_filter: kindFilter,
+                    });
+                    setFrom(route.from_iata);
+                    setTo(route.to_iata);
+                    // Trigger search automatically
+                    setError(null);
+                    setLoading(true);
+                    setSearched(true);
+
+                    track("search_started", {
+                      from_iata: route.from_iata,
+                      to_iata: route.to_iata,
+                      kind_filter: "all",
+                      source: "popular_route",
+                    });
+
+                    try {
+                      // Show all types when clicking popular route
+                      const result: any = await api.listPubs(route.from_iata, route.to_iata, undefined);
+                      if (Array.isArray(result)) {
+                        setRows(result);
+                        track("search_completed", {
+                          from_iata: route.from_iata,
+                          to_iata: route.to_iata,
+                          kind_filter: "all",
+                          results_count: result.length,
+                          source: "popular_route",
+                        });
+
+                        if (result.length > 0) {
+                          track("search_results_viewed", {
+                            from_iata: route.from_iata,
+                            to_iata: route.to_iata,
+                            kind_filter: "all",
+                            results_count: result.length,
+                            source: "popular_route",
+                          });
+                        }
+                      } else if (result && typeof result === "object" && "error" in result) {
+                        setError(result.error || "Ошибка при поиске");
+                        setRows([]);
+                      } else {
+                        setRows([]);
+                      }
+                    } catch (err) {
+                      setError("Произошла ошибка при поиске. Попробуйте еще раз.");
+                      setRows([]);
+                      track("search_error", {
+                        from_iata: route.from_iata,
+                        to_iata: route.to_iata,
+                        kind_filter: "all",
+                        error: String(err),
+                        source: "popular_route",
+                      });
+                    } finally {
+                      setLoading(false);
+                    }
+                  }}
+                  className="px-3 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 hover:border-gray-400 active:bg-gray-100 transition-colors touch-manipulation flex items-center gap-1.5"
+                >
+                  <span>{route.from_city || route.from_iata} → {route.to_city || route.to_iata}</span>
+                  <span className="px-1.5 py-0.5 bg-blue-100 text-blue-700 rounded font-semibold text-xs">
+                    {route.count}
+                  </span>
+                </button>
+              ))}
+            </div>
+          </div>
+        )}
+
         {searched && (
           <div className="space-y-3">
+            {/* Clear search button */}
+            <div className="flex justify-end">
+              <button
+                type="button"
+                onClick={() => {
+                  track("search_cleared", { from_iata: from, to_iata: to, kind_filter: kindFilter });
+                  setFrom("");
+                  setTo("");
+                  setSearched(false);
+                  setRows([]);
+                  setError(null);
+                }}
+                className="btn btn-secondary flex items-center gap-2"
+              >
+                <HiX className="w-4 h-4" />
+                Очистить поиск
+              </button>
+            </div>
             {loading ? (
               <div className="card p-12 text-center">
                 <div className="w-12 h-12 border-4 border-primary-200 border-t-primary-600 rounded-full animate-spin mx-auto mb-4" />

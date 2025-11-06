@@ -39,6 +39,9 @@ func RegisterRoutes(r *gin.Engine, pool *pgxpool.Pool) {
 		RegisterPublicationAuthRoutes(auth, pool)
 		RegisterMatchAuthRoutes(auth, pool)
 		RegisterDealRoutes(auth, pool)
+
+		// Admin routes (protected by admin key)
+		RegisterAdminRoutes(api, pool)
 	}
 
 	registerBotRoutes(r, pool)

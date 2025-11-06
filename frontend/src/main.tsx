@@ -9,6 +9,7 @@ import PublishPage from "./pages/PublishPage";
 import BrowsePage from "./pages/BrowsePage";
 import AuthPage from "./pages/AuthPage";
 import ProfilePage from "./pages/ProfilePage";
+import AdminPage from "./pages/AdminPage";
 import PolicyFooter from "./components/PolicyFooter";
 import SupportBanner from "./components/SupportBanner";
 import Logo from "./components/Logo";
@@ -164,6 +165,7 @@ function App() {
                   <Route path="/" element={<BrowsePage />} />
                   <Route path="/publish" element={<PublishPage />} />
                   <Route path="/profile" element={<ProfilePage />} />
+                  <Route path="/admin" element={<AdminPage />} />
                 </Routes>
                 <SupportBanner />
               </main>
