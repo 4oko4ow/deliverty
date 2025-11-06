@@ -165,9 +165,7 @@ function App() {
                   <Route path="/publish" element={<PublishPage />} />
                   <Route path="/profile" element={<ProfilePage />} />
                 </Routes>
-                <div className="mt-8">
-                  <SupportBanner />
-                </div>
+                <SupportBanner />
               </main>
               <PolicyFooter />
               <BottomNav />

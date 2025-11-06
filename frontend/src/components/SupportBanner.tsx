@@ -1,5 +1,5 @@
-import React from "react";
-import { HiOutlineExclamationCircle } from "react-icons/hi";
+import React, { useState } from "react";
+import { HiOutlineQuestionMarkCircle, HiOutlineX } from "react-icons/hi";
 import { FaTelegram } from "react-icons/fa";
 
 interface SupportBannerProps {
@@ -11,6 +11,8 @@ export default function SupportBanner({
   message = "Что-то не работает или есть вопросы?",
   telegramUsername 
 }: SupportBannerProps) {
+  const [isOpen, setIsOpen] = useState(false);
+  
   // Get Telegram username from env or prop
   const tgUsername = telegramUsername || import.meta.env.VITE_SUPPORT_TELEGRAM || "";
   
@@ -25,20 +27,46 @@ export default function SupportBanner({
     : telegramUrl;
 
   return (
-    <div className="flex items-start gap-3 p-4 bg-amber-50 border border-amber-200 rounded-lg">
-      <HiOutlineExclamationCircle className="w-5 h-5 text-amber-600 flex-shrink-0 mt-0.5" />
-      <div className="flex-1 min-w-0">
-        <p className="text-sm text-amber-800 mb-2">{message}</p>
-        <a
-          href={telegramLink}
-          target="_blank"
-          rel="noopener noreferrer"
-          className="inline-flex items-center gap-2 px-4 py-2 bg-[#0088cc] text-white text-sm font-medium rounded-lg hover:bg-[#0077b5] transition-colors"
-        >
-          <FaTelegram className="w-4 h-4" />
-          Написать в Telegram
-        </a>
-      </div>
+    <div className="fixed bottom-20 right-4 sm:bottom-6 z-40">
+      {/* Expanded card */}
+      {isOpen && (
+        <div className="mb-3 w-72 sm:w-80 bg-white rounded-lg shadow-lg border border-gray-200 p-4 animate-slide-up">
+          <div className="flex items-start justify-between mb-3">
+            <h3 className="text-sm font-semibold text-gray-900">Поддержка</h3>
+            <button
+              onClick={() => setIsOpen(false)}
+              className="text-gray-400 hover:text-gray-600 transition-colors touch-manipulation"
+              aria-label="Закрыть"
+            >
+              <HiOutlineX className="w-5 h-5" />
+            </button>
+          </div>
+          <p className="text-xs text-gray-600 mb-3">{message}</p>
+          <a
+            href={telegramLink}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="inline-flex items-center justify-center gap-2 w-full px-4 py-2.5 bg-[#0088cc] text-white text-sm font-medium rounded-lg hover:bg-[#0077b5] transition-colors touch-manipulation"
+            onClick={() => setIsOpen(false)}
+          >
+            <FaTelegram className="w-4 h-4" />
+            Написать в Telegram
+          </a>
+        </div>
+      )}
+      
+      {/* Floating button */}
+      <button
+        onClick={() => setIsOpen(!isOpen)}
+        className="w-14 h-14 bg-gradient-to-br from-primary-500 to-primary-600 text-white rounded-full shadow-lg hover:shadow-xl transition-all duration-200 flex items-center justify-center hover:scale-105 active:scale-95 touch-manipulation"
+        aria-label="Поддержка"
+      >
+        {isOpen ? (
+          <HiOutlineX className="w-6 h-6" />
+        ) : (
+          <HiOutlineQuestionMarkCircle className="w-6 h-6" />
+        )}
+      </button>
     </div>
   );
 }
