@@ -716,8 +716,8 @@ func getPopularRoutes(pool *pgxpool.Pool) gin.HandlerFunc {
 		  FROM route_cities
 		  GROUP BY from_city, to_city
 		  HAVING COUNT(*) > 0
-		  ORDER BY count DESC
-		  LIMIT 10`
+          ORDER BY count DESC
+          LIMIT 30`
 
 		rows, err := pool.Query(c, qry)
 		if err != nil {

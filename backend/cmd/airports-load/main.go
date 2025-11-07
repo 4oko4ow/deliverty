@@ -72,3 +72,4 @@ func main() {
 
 	log.Printf("done: loaded %d airports\n", count)
 }
+
