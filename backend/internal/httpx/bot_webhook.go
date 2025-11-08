@@ -12,6 +12,7 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/sol/deliverty/backend/internal/bot"
+	"github.com/sol/deliverty/backend/internal/posthog"
 )
 
 // buildProfileText builds a profile text with username and rating
@@ -22,7 +23,7 @@ func buildProfileText(username string, rating int) string {
 	} else {
 		namePart = "👤 Пользователь\n"
 	}
-	
+
 	stars := "⭐"
 	if rating > 0 {
 		starCount := rating
@@ -36,14 +37,14 @@ func buildProfileText(username string, rating int) string {
 	} else {
 		stars = "⭐ (нет оценок)"
 	}
-	
+
 	return fmt.Sprintf("%s📊 Рейтинг: %s (%d)", namePart, stars, rating)
 }
 
 // buildDealStatusKeyboard builds an inline keyboard based on the current deal status
 func buildDealStatusKeyboard(status string, dealID int64) gin.H {
 	var buttons [][]gin.H
-	
+
 	// Add status buttons based on current status
 	if status == "new" || status == "" {
 		// Show all status buttons for new deals
@@ -86,7 +87,7 @@ func buildDealStatusKeyboard(status string, dealID int64) gin.H {
 	} else if status == "cancelled" {
 		// Deal is cancelled, no buttons
 	}
-	
+
 	return gin.H{
 		"inline_keyboard": buttons,
 	}
@@ -105,8 +106,8 @@ type Update struct {
 		} `json:"chat"`
 	} `json:"message"`
 	CallbackQuery *struct {
-		ID      string `json:"id"`
-		From    struct {
+		ID   string `json:"id"`
+		From struct {
 			ID int64 `json:"id"`
 		} `json:"from"`
 		Message struct {
@@ -122,30 +123,30 @@ type Update struct {
 func registerBotRoutes(r *gin.Engine, pool *pgxpool.Pool) {
 	r.POST("/bot/webhook", func(c *gin.Context) {
 		log.Printf("[BOT] Webhook called - received request")
-		
+
 		var up Update
 		if err := c.ShouldBindJSON(&up); err != nil {
 			log.Printf("[BOT] Failed to parse JSON: %v", err)
 			c.Status(http.StatusOK)
 			return
 		}
-		
+
 		tg := bot.New()
 
 		// Handle callback query (button clicks)
 		if up.CallbackQuery != nil {
 			log.Printf("[BOT] Received callback query from user %d: %q", up.CallbackQuery.From.ID, up.CallbackQuery.Data)
-			
+
 			// Handle start_deal callback
 			if strings.HasPrefix(up.CallbackQuery.Data, "start_deal:") {
 				startParam := strings.TrimPrefix(up.CallbackQuery.Data, "start_deal:")
 				log.Printf("[BOT] Processing callback as /start command: %q", startParam)
-				
+
 				// Answer callback to remove loading state
 				_, _ = tg.API("answerCallbackQuery", gin.H{
 					"callback_query_id": up.CallbackQuery.ID,
 				})
-				
+
 				// Process the start command directly
 				processStartDeal(c.Request.Context(), pool, tg, up.CallbackQuery.From.ID, up.CallbackQuery.Message.Chat.ID, startParam)
 				c.Status(http.StatusOK)
@@ -162,9 +163,9 @@ func registerBotRoutes(r *gin.Engine, pool *pgxpool.Pool) {
 						_, _ = tg.API("answerCallbackQuery", gin.H{
 							"callback_query_id": up.CallbackQuery.ID,
 						})
-						
+
 						setStatus(c, pool, tg, up.CallbackQuery.From.ID, up.CallbackQuery.Message.Chat.ID, status)
-						
+
 						// Find the deal and get counterpart info to rebuild the message
 						var dealID int64
 						var counterpartRating int
@@ -184,27 +185,27 @@ func registerBotRoutes(r *gin.Engine, pool *pgxpool.Pool) {
 							WHERE (ur.tg_user_id=$1 OR ut.tg_user_id=$1)
 							ORDER BY d.last_message_at DESC LIMIT 1
 						`, up.CallbackQuery.From.ID).Scan(&dealID, &currentStatus, &counterpartRating, &counterpartUsername)
-						
+
 						if dealID > 0 {
 							counterpartInfo := buildProfileText(counterpartUsername, counterpartRating)
-							
+
 							// Build message text with status info
 							statusText := map[string]string{
-								"agreed":      "✅ Согласовано",
+								"agreed":       "✅ Согласовано",
 								"handoff_done": "✅ Передача завершена",
 								"cancelled":    "❌ Отменено",
 							}
-							
+
 							statusInfo := ""
 							if currentStatus != "new" {
 								statusInfo = fmt.Sprintf("\n\n📊 Статус: %s", statusText[currentStatus])
 							}
-							
+
 							messageText := fmt.Sprintf("✅ Подключено к сделке!%s\n\n👤 Участник:\n%s\n\nОтправляйте сообщения сюда для пересылки. Используйте кнопки ниже для управления сделкой.", statusInfo, counterpartInfo)
-							
+
 							// Build keyboard based on current status
 							keyboard := buildDealStatusKeyboard(currentStatus, dealID)
-							
+
 							// Update message with keyboard preserved
 							_, _ = tg.API("editMessageText", gin.H{
 								"chat_id":      up.CallbackQuery.Message.Chat.ID,
@@ -212,14 +213,14 @@ func registerBotRoutes(r *gin.Engine, pool *pgxpool.Pool) {
 								"text":         messageText,
 								"reply_markup": keyboard,
 							})
-							
+
 							// If status is handoff_done, show rating button
 							if status == "handoff_done" {
 								var alreadyRated bool
 								_ = pool.QueryRow(c, `
 									SELECT EXISTS(SELECT 1 FROM rating_log WHERE deal_id=$1 AND rater_tg=$2)
 								`, dealID, up.CallbackQuery.From.ID).Scan(&alreadyRated)
-								
+
 								if !alreadyRated {
 									ratingKeyboard := gin.H{
 										"inline_keyboard": [][]gin.H{
@@ -231,7 +232,7 @@ func registerBotRoutes(r *gin.Engine, pool *pgxpool.Pool) {
 											},
 										},
 									}
-									
+
 									_, _ = tg.API("sendMessage", gin.H{
 										"chat_id":      up.CallbackQuery.Message.Chat.ID,
 										"text":         "Пожалуйста, оцените участника сделки.",
@@ -240,7 +241,7 @@ func registerBotRoutes(r *gin.Engine, pool *pgxpool.Pool) {
 								}
 							}
 						}
-						
+
 						c.Status(http.StatusOK)
 						return
 					}
@@ -251,14 +252,14 @@ func registerBotRoutes(r *gin.Engine, pool *pgxpool.Pool) {
 			if strings.HasPrefix(up.CallbackQuery.Data, "contact_agreed:") {
 				contactRequestIDStr := strings.TrimPrefix(up.CallbackQuery.Data, "contact_agreed:")
 				contactRequestID, err := strconv.ParseInt(contactRequestIDStr, 10, 64)
-				
+
 				if err == nil {
 					// Answer callback first
 					_, _ = tg.API("answerCallbackQuery", gin.H{
 						"callback_query_id": up.CallbackQuery.ID,
-						"text":             "✅ Спасибо! Объявление скрыто с поиска.",
+						"text":              "✅ Спасибо! Объявление скрыто с поиска.",
 					})
-					
+
 					// Update contact request status
 					var pubID int64
 					err = pool.QueryRow(c, `
@@ -267,11 +268,37 @@ func registerBotRoutes(r *gin.Engine, pool *pgxpool.Pool) {
 						WHERE id=$1
 						RETURNING publication_id
 					`, contactRequestID).Scan(&pubID)
-					
+
 					if err == nil && pubID > 0 {
+						var (
+							requesterUserID int64
+							ownerUserID     int64
+							pubKind         string
+							fromIATA        string
+							toIATA          string
+						)
+						if detErr := pool.QueryRow(c, `
+							SELECT cr.requester_user_id, p.user_id, p.kind, p.from_iata, p.to_iata
+							FROM contact_request cr
+							JOIN publication p ON p.id = cr.publication_id
+							WHERE cr.id=$1
+						`, contactRequestID).Scan(&requesterUserID, &ownerUserID, &pubKind, &fromIATA, &toIATA); detErr == nil {
+							props := map[string]any{
+								"pub_id":             pubID,
+								"pub_kind":           pubKind,
+								"from_iata":          fromIATA,
+								"to_iata":            toIATA,
+								"contact_request_id": contactRequestID,
+								"owner_user_id":      ownerUserID,
+								"requester_user_id":  requesterUserID,
+								"trigger":            "telegram_contact_agreed",
+							}
+							posthog.Capture("deal_created", strconv.FormatInt(requesterUserID, 10), props)
+						}
+
 						// Hide publication from search
 						_, _ = pool.Exec(c, `UPDATE publication SET is_active=false WHERE id=$1`, pubID)
-						
+
 						// Update message to show it's been agreed
 						_, _ = tg.API("editMessageText", gin.H{
 							"chat_id":    up.CallbackQuery.Message.Chat.ID,
@@ -280,7 +307,7 @@ func registerBotRoutes(r *gin.Engine, pool *pgxpool.Pool) {
 						})
 					}
 				}
-				
+
 				c.Status(http.StatusOK)
 				return
 			}
@@ -288,21 +315,48 @@ func registerBotRoutes(r *gin.Engine, pool *pgxpool.Pool) {
 			if strings.HasPrefix(up.CallbackQuery.Data, "contact_declined:") {
 				contactRequestIDStr := strings.TrimPrefix(up.CallbackQuery.Data, "contact_declined:")
 				contactRequestID, err := strconv.ParseInt(contactRequestIDStr, 10, 64)
-				
+
 				if err == nil {
 					// Answer callback first
 					_, _ = tg.API("answerCallbackQuery", gin.H{
 						"callback_query_id": up.CallbackQuery.ID,
-						"text":             "Объявление остается активным.",
+						"text":              "Объявление остается активным.",
 					})
-					
+
 					// Update contact request status
 					_, _ = pool.Exec(c, `
 						UPDATE contact_request 
 						SET status='declined', updated_at=now()
 						WHERE id=$1
 					`, contactRequestID)
-					
+
+					var (
+						requesterUserID int64
+						ownerUserID     int64
+						pubID           int64
+						pubKind         string
+						fromIATA        string
+						toIATA          string
+					)
+					if detErr := pool.QueryRow(c, `
+						SELECT cr.requester_user_id, p.user_id, cr.publication_id, p.kind, p.from_iata, p.to_iata
+						FROM contact_request cr
+						JOIN publication p ON p.id = cr.publication_id
+						WHERE cr.id=$1
+					`, contactRequestID).Scan(&requesterUserID, &ownerUserID, &pubID, &pubKind, &fromIATA, &toIATA); detErr == nil {
+						props := map[string]any{
+							"pub_id":             pubID,
+							"pub_kind":           pubKind,
+							"from_iata":          fromIATA,
+							"to_iata":            toIATA,
+							"contact_request_id": contactRequestID,
+							"owner_user_id":      ownerUserID,
+							"requester_user_id":  requesterUserID,
+							"trigger":            "telegram_contact_declined",
+						}
+						posthog.Capture("deal_error", strconv.FormatInt(requesterUserID, 10), props)
+					}
+
 					// Update message
 					_, _ = tg.API("editMessageText", gin.H{
 						"chat_id":    up.CallbackQuery.Message.Chat.ID,
@@ -310,7 +364,7 @@ func registerBotRoutes(r *gin.Engine, pool *pgxpool.Pool) {
 						"text":       "❌ Не договорились. Объявление остается активным.",
 					})
 				}
-				
+
 				c.Status(http.StatusOK)
 				return
 			}
@@ -319,14 +373,14 @@ func registerBotRoutes(r *gin.Engine, pool *pgxpool.Pool) {
 			if strings.HasPrefix(up.CallbackQuery.Data, "rate_deal:") {
 				dealIDStr := strings.TrimPrefix(up.CallbackQuery.Data, "rate_deal:")
 				dealID, err := strconv.ParseInt(dealIDStr, 10, 64)
-				
+
 				if err == nil {
 					// Answer callback first
 					_, _ = tg.API("answerCallbackQuery", gin.H{
 						"callback_query_id": up.CallbackQuery.ID,
-						"text":             "Спасибо за оценку!",
+						"text":              "Спасибо за оценку!",
 					})
-					
+
 					// Rate the deal (increment counterpart's rating)
 					uid := strconv.FormatInt(up.CallbackQuery.From.ID, 10)
 					_, _ = pool.Exec(c, `
@@ -349,7 +403,7 @@ func registerBotRoutes(r *gin.Engine, pool *pgxpool.Pool) {
 						WHERE u.id = (SELECT target_user_id FROM d)
 							AND EXISTS (SELECT 1 FROM once)
 					`, dealID, uid)
-					
+
 					// Update the button message to show it's been rated
 					_, _ = tg.API("editMessageText", gin.H{
 						"chat_id":    up.CallbackQuery.Message.Chat.ID,
@@ -357,7 +411,7 @@ func registerBotRoutes(r *gin.Engine, pool *pgxpool.Pool) {
 						"text":       "✅ Спасибо! Вы оценили участника сделки.",
 					})
 				}
-				
+
 				c.Status(http.StatusOK)
 				return
 			}
@@ -426,7 +480,7 @@ func registerBotRoutes(r *gin.Engine, pool *pgxpool.Pool) {
 				SELECT COALESCE(rating_small, 0), COALESCE(tg_username, '')
 				FROM app_user WHERE tg_user_id=$1
 			`, up.Message.From.ID).Scan(&rating, &username)
-			
+
 			profileText := buildProfileText(username, rating)
 			_, _ = tg.API("sendMessage", gin.H{
 				"chat_id": up.Message.Chat.ID,
@@ -444,7 +498,7 @@ func registerBotRoutes(r *gin.Engine, pool *pgxpool.Pool) {
 				SELECT COALESCE(rating_small, 0), COALESCE(tg_username, '')
 				FROM app_user WHERE tg_user_id=$1
 			`, up.Message.From.ID).Scan(&rating, &username)
-			
+
 			if err != nil {
 				_, _ = tg.API("sendMessage", gin.H{
 					"chat_id": up.Message.Chat.ID,
@@ -479,36 +533,36 @@ func registerBotRoutes(r *gin.Engine, pool *pgxpool.Pool) {
 
 func processStartDeal(ctx context.Context, pool *pgxpool.Pool, tg *bot.TG, userID, chatID int64, startParam string) {
 	log.Printf("[BOT] Processing deep-link (raw): %q", startParam)
-	
+
 	// Try to URL-decode in case Telegram didn't decode it automatically
 	decoded, err := url.QueryUnescape(startParam)
 	if err == nil && decoded != startParam {
 		log.Printf("[BOT] URL-decoded parameter: %q -> %q", startParam, decoded)
 		startParam = decoded
 	}
-	
+
 	log.Printf("[BOT] Processing deep-link (after decode): %q", startParam)
-	
+
 	parts := strings.Split(startParam, ":")
 	log.Printf("[BOT] Split parts: %v (len=%d)", parts, len(parts))
-	
+
 	if len(parts) != 3 {
 		log.Printf("[BOT] Invalid parts count: expected 3, got %d", len(parts))
 		_, _ = tg.API("sendMessage", gin.H{"chat_id": chatID, "text": "Неверная ссылка: неверный формат"})
 		return
 	}
-	
+
 	if parts[0] != "deal" {
 		log.Printf("[BOT] Invalid prefix: expected 'deal', got %q", parts[0])
 		_, _ = tg.API("sendMessage", gin.H{"chat_id": chatID, "text": "Неверная ссылка: неверный тип"})
 		return
 	}
-	
+
 	payload := parts[0] + ":" + parts[1]
 	sig := parts[2]
 	isValid := bot.Verify(payload, sig)
 	log.Printf("[BOT] Verifying signature: payload=%q, sig=%q, valid=%v", payload, sig, isValid)
-	
+
 	if !isValid {
 		log.Printf("[BOT] Signature verification failed")
 		_, _ = tg.API("sendMessage", gin.H{"chat_id": chatID, "text": "Неверная ссылка: подпись неверна"})
@@ -535,7 +589,7 @@ func processStartDeal(ctx context.Context, pool *pgxpool.Pool, tg *bot.TG, userI
 		_, _ = tg.API("sendMessage", gin.H{"chat_id": chatID, "text": "Ошибка при проверке участника"})
 		return
 	}
-	
+
 	log.Printf("[BOT] User %d is participant: %v", userID, ok)
 
 	if !ok {
@@ -545,7 +599,7 @@ func processStartDeal(ctx context.Context, pool *pgxpool.Pool, tg *bot.TG, userI
 	}
 
 	log.Printf("[BOT] Successfully connected user %d to deal %s", userID, dealID)
-	
+
 	// Get counterpart info and rating
 	var counterpartRating int
 	var counterpartUsername string
@@ -564,29 +618,29 @@ func processStartDeal(ctx context.Context, pool *pgxpool.Pool, tg *bot.TG, userI
 		JOIN app_user ut ON ut.id=pt.user_id
 		WHERE d.id=$1
 	`, dealID, userID).Scan(&counterpartRating, &counterpartUsername, &currentUserRating, &currentUsername)
-	
+
 	counterpartInfo := buildProfileText(counterpartUsername, counterpartRating)
-	
+
 	// Get current deal status
 	var currentStatus string
 	dealIDInt, _ := strconv.ParseInt(dealID, 10, 64)
 	_ = pool.QueryRow(ctx, `SELECT status FROM deal WHERE id=$1`, dealID).Scan(&currentStatus)
-	
+
 	// Create inline keyboard with status buttons based on current status
 	keyboard := buildDealStatusKeyboard(currentStatus, dealIDInt)
-	
+
 	// Build message text with status info
 	statusText := map[string]string{
-		"agreed":      "✅ Согласовано",
+		"agreed":       "✅ Согласовано",
 		"handoff_done": "✅ Передача завершена",
 		"cancelled":    "❌ Отменено",
 	}
-	
+
 	statusInfo := ""
 	if currentStatus != "new" && currentStatus != "" {
 		statusInfo = fmt.Sprintf("\n\n📊 Статус: %s", statusText[currentStatus])
 	}
-	
+
 	text := fmt.Sprintf("✅ Подключено к сделке!%s\n\n👤 Участник:\n%s\n\nОтправляйте сообщения сюда для пересылки. Используйте кнопки ниже для управления сделкой.", statusInfo, counterpartInfo)
 	_, _ = tg.API("sendMessage", gin.H{
 		"chat_id":      chatID,
@@ -607,20 +661,20 @@ func setStatus(c *gin.Context, pool *pgxpool.Pool, tg *bot.TG, fromTG int64, cha
 	      JOIN app_user ut ON ut.id=pt.user_id
 	    WHERE ur.tg_user_id=$2 OR ut.tg_user_id=$2
 	  )`, status, fromTG)
-	
+
 	// If called from command (not callback), send confirmation
 	if tg != nil && rowsAffected.RowsAffected() > 0 {
 		statusText := map[string]string{
-			"agreed":      "✅ Согласовано",
+			"agreed":       "✅ Согласовано",
 			"handoff_done": "✅ Передача завершена",
 			"cancelled":    "❌ Отменено",
 		}
-		
+
 		_, _ = tg.API("sendMessage", gin.H{
 			"chat_id": chatID,
 			"text":    fmt.Sprintf("%s\n\nСтатус обновлен.", statusText[status]),
 		})
-		
+
 		// If status is handoff_done, show rating button
 		if status == "handoff_done" {
 			var dealID int64
@@ -633,13 +687,13 @@ func setStatus(c *gin.Context, pool *pgxpool.Pool, tg *bot.TG, fromTG int64, cha
 				WHERE (ur.tg_user_id=$1 OR ut.tg_user_id=$1) AND d.status='handoff_done'
 				ORDER BY d.last_message_at DESC LIMIT 1
 			`, fromTG).Scan(&dealID)
-			
+
 			if dealID > 0 {
 				var alreadyRated bool
 				_ = pool.QueryRow(c, `
 					SELECT EXISTS(SELECT 1 FROM rating_log WHERE deal_id=$1 AND rater_tg=$2)
 				`, dealID, fromTG).Scan(&alreadyRated)
-				
+
 				if !alreadyRated {
 					keyboard := gin.H{
 						"inline_keyboard": [][]gin.H{
@@ -651,7 +705,7 @@ func setStatus(c *gin.Context, pool *pgxpool.Pool, tg *bot.TG, fromTG int64, cha
 							},
 						},
 					}
-					
+
 					_, _ = tg.API("sendMessage", gin.H{
 						"chat_id":      chatID,
 						"text":         "Пожалуйста, оцените участника сделки.",

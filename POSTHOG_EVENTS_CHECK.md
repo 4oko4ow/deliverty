@@ -69,20 +69,15 @@
   - Добавлена функция `track` с проверкой `if (posthog)`
   - Логирование для отладки
 
-### 8. `deal_started` ✅
-- **Файл**: `frontend/src/pages/BrowsePage.tsx`
-- **Статус**: ✅ Проверено
-- **Исправления**:
-  - Использует функцию `track` с проверкой `if (posthog)`
-  - Логирование для отладки
+### 8. `deal_started` ✅ (бекенд)
+- **Файл**: `backend/internal/httpx/publications.go`
+- **Статус**: ✅ Отправляется
+- **Примечание**: Событие шлётся с бекенда при создании `contact_request` через Telegram/Web (distinct_id = id пользователя). Источник `trigger = web_request_contacts`.
 
-### 9. `deal_created` ✅
-- **Файл**: `frontend/src/pages/BrowsePage.tsx`
-- **Статус**: ✅ Проверено
-- **Исправления**:
-  - Использует функцию `track` с проверкой `if (posthog)`
-  - Логирование для отладки
-  - Отправляется в двух местах (для разных типов публикаций)
+### 9. `deal_created` ✅ (бекенд)
+- **Файл**: `backend/internal/httpx/bot_webhook.go`
+- **Статус**: ✅ Отправляется
+- **Примечание**: Событие приходит из обработчика `contact_agreed` в Telegram-боте (`trigger = telegram_contact_agreed`).
 
 ## 📋 Все события по категориям
 
@@ -120,10 +115,10 @@
 - ✅ `telegram_link_clicked` - использует `track`
 
 ### Сделки
-- ✅ `deal_started` - проверено
-- ✅ `deal_created` - проверено
-- ✅ `deal_error` - использует `track`
-- ✅ `deal_attempted_not_authenticated` - использует `track`
+- ✅ `deal_started` - отправляется с бекенда при создании `contact_request`
+- ✅ `deal_created` - отправляется с бекенда при нажатии «✅ Договорились» в Telegram
+- ✅ `deal_error` - отправляется с бекенда при «❌ Не договорились» в Telegram
+- ⚠️ `deal_attempted_not_authenticated` - пока не используется (нет вызовов `makeDeal` во фронте)
 
 ### Профиль
 - ✅ `profile_page_viewed` - использует `track` (отправляется в `loadData`)

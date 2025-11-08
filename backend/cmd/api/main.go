@@ -10,10 +10,13 @@ import (
 	"github.com/sol/deliverty/backend/internal/db"
 	"github.com/sol/deliverty/backend/internal/httpx"
 	"github.com/sol/deliverty/backend/internal/migrations"
+	"github.com/sol/deliverty/backend/internal/posthog"
 )
 
 func main() {
 	_ = godotenv.Load()
+
+	posthog.InitFromEnv()
 
 	dsn := os.Getenv("DATABASE_URL")
 	if dsn == "" {

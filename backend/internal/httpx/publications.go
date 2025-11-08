@@ -12,6 +12,7 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/sol/deliverty/backend/internal/bot"
+	"github.com/sol/deliverty/backend/internal/posthog"
 )
 
 var contactsRe = regexp.MustCompile(`(?i)(\+?\d[\d\-\s]{6,}|@[\w_]{3,}|https?://)`)
@@ -520,6 +521,7 @@ func requestContacts(pool *pgxpool.Pool) gin.HandlerFunc {
 		// Check if request already exists
 		var existingID int64
 		var contactRequestID int64
+		isNewRequest := false
 		err = pool.QueryRow(c, `
 			SELECT id FROM contact_request
 			WHERE publication_id=$1 AND requester_user_id=$2
@@ -539,6 +541,7 @@ func requestContacts(pool *pgxpool.Pool) gin.HandlerFunc {
 				c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to create request"})
 				return
 			}
+			isNewRequest = true
 		}
 
 		// Get publication details for notifications
@@ -674,6 +677,20 @@ func requestContacts(pool *pgxpool.Pool) gin.HandlerFunc {
 			if err != nil {
 				log.Printf("[PUBLICATIONS] Failed to send message to owner: %v", err)
 			}
+		}
+
+		if isNewRequest {
+			props := map[string]any{
+				"pub_id":             pubID,
+				"pub_kind":           pubKind,
+				"from_iata":          fromIATA,
+				"to_iata":            toIATA,
+				"contact_request_id": contactRequestID,
+				"owner_user_id":      ownerUserID,
+				"requester_user_id":  requesterUID,
+				"trigger":            "web_request_contacts",
+			}
+			posthog.Capture("deal_started", strconv.FormatInt(requesterUID, 10), props)
 		}
 
 		// Return owner's contact info to requester
