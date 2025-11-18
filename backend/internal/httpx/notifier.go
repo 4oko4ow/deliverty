@@ -3,6 +3,7 @@ package httpx
 import (
 	"context"
 	"fmt"
+	"log"
 	"time"
 
 	"github.com/jackc/pgx/v5/pgxpool"
@@ -24,6 +25,9 @@ func StartReminders(pool *pgxpool.Pool) {
 }
 
 func runReminders(ctx context.Context, pool *pgxpool.Pool, tg *bot.TG) {
+	// 0) Deactivate publications older than 3 days
+	deactivateOldPublications(ctx, pool)
+
 	// 1) Trip pre-reminders at T-24h and T-3h
 	type row struct {
 		ID                      int64
@@ -114,4 +118,44 @@ func seen(ctx context.Context, pool *pgxpool.Pool, key string) bool {
 
 func logKey(ctx context.Context, pool *pgxpool.Pool, key string) {
 	_, _ = pool.Exec(ctx, `INSERT INTO reminder_log(key) VALUES ($1) ON CONFLICT DO NOTHING`, key)
+}
+
+// deactivateOldPublications automatically deactivates publications that are older than 3 days
+// For trips: uses date field, for requests: uses date_end field
+func deactivateOldPublications(ctx context.Context, pool *pgxpool.Pool) {
+	// Deactivate trips where date < CURRENT_DATE - 3 days
+	result, err := pool.Exec(ctx, `
+		UPDATE publication
+		SET is_active = false
+		WHERE is_active = true
+		  AND kind = 'trip'
+		  AND date IS NOT NULL
+		  AND date < CURRENT_DATE - INTERVAL '3 days'
+	`)
+	if err != nil {
+		log.Printf("[DEACTIVATE] Error deactivating old trips: %v", err)
+	} else {
+		rowsAffected := result.RowsAffected()
+		if rowsAffected > 0 {
+			log.Printf("[DEACTIVATE] Deactivated %d old trip(s)", rowsAffected)
+		}
+	}
+
+	// Deactivate requests where date_end < CURRENT_DATE - 3 days
+	result, err = pool.Exec(ctx, `
+		UPDATE publication
+		SET is_active = false
+		WHERE is_active = true
+		  AND kind = 'request'
+		  AND date_end IS NOT NULL
+		  AND date_end < CURRENT_DATE - INTERVAL '3 days'
+	`)
+	if err != nil {
+		log.Printf("[DEACTIVATE] Error deactivating old requests: %v", err)
+	} else {
+		rowsAffected := result.RowsAffected()
+		if rowsAffected > 0 {
+			log.Printf("[DEACTIVATE] Deactivated %d old request(s)", rowsAffected)
+		}
+	}
 }
