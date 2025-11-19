@@ -30,10 +30,10 @@ func runReminders(ctx context.Context, pool *pgxpool.Pool, tg *bot.TG) {
 
 	// 1) Trip pre-reminders at T-24h and T-3h
 	type row struct {
-		ID                      int64
-		Kind, From, To          string
-		Start                   time.Time
-		ReqTG, TripTG           int64
+		ID             int64
+		Kind, From, To string
+		Start          time.Time
+		ReqTG, TripTG  int64
 	}
 	for _, rule := range []struct {
 		label string
