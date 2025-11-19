@@ -36,9 +36,9 @@ const HOW_STEPS: LandingStep[] = [
     icon: HiOutlinePencilAlt,
   },
   {
-    title: "Общение в Telegram-боте",
-    description: "Отклики идут через relay‑чат в боте, личные контакты не раскрываются.",
-    icon: HiOutlineChatAlt2,
+    title: "Находите совпадение",
+    description: "Сервис автоматически подберёт подходящие маршруты и даты. Выберите удобный вариант.",
+    icon: HiOutlineSearch,
   },
   {
     title: "Передача или доставка",
