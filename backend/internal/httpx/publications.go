@@ -268,7 +268,7 @@ func getPublication(pool *pgxpool.Pool) gin.HandlerFunc {
 		idStr := c.Param("id")
 		id, err := strconv.ParseInt(idStr, 10, 64)
 		if err != nil {
-			c.JSON(http.StatusBadRequest, gin.H{"error": "invalid id"})
+			c.JSON(http.StatusBadRequest, gin.H{"error": "Неверный идентификатор объявления"})
 			return
 		}
 
@@ -300,7 +300,7 @@ func getPublication(pool *pgxpool.Pool) gin.HandlerFunc {
 		`, id).Scan(&p.ID, &p.Kind, &p.From, &p.To, &ds, &de, &singleDate, &p.Item, &p.Weight, &p.RewardHint, &p.Description, &p.UserRating, &p.Username)
 		if err != nil {
 			log.Printf("[PUBLICATIONS] getPublication error: %v, id: %d", err, id)
-			c.JSON(http.StatusNotFound, gin.H{"error": "publication not found"})
+			c.JSON(http.StatusNotFound, gin.H{"error": "Объявление не найдено"})
 			return
 		}
 
@@ -319,7 +319,7 @@ func listMyPublications(pool *pgxpool.Pool) gin.HandlerFunc {
 		// Get user ID from context (set by WithUser middleware)
 		userID, exists := c.Get(CtxDBUserID)
 		if !exists {
-			c.JSON(http.StatusUnauthorized, gin.H{"error": "not authenticated"})
+			c.JSON(http.StatusUnauthorized, gin.H{"error": "Требуется авторизация"})
 			return
 		}
 		uid := userID.(int64)
@@ -425,7 +425,7 @@ func updatePublication(pool *pgxpool.Pool) gin.HandlerFunc {
 		// Get user ID from context
 		userID, exists := c.Get(CtxDBUserID)
 		if !exists {
-			c.JSON(http.StatusUnauthorized, gin.H{"error": "not authenticated"})
+			c.JSON(http.StatusUnauthorized, gin.H{"error": "Требуется авторизация"})
 			return
 		}
 		uid := userID.(int64)
@@ -433,7 +433,7 @@ func updatePublication(pool *pgxpool.Pool) gin.HandlerFunc {
 		idStr := c.Param("id")
 		pubID, err := strconv.ParseInt(idStr, 10, 64)
 		if err != nil {
-			c.JSON(http.StatusBadRequest, gin.H{"error": "invalid id"})
+			c.JSON(http.StatusBadRequest, gin.H{"error": "Неверный идентификатор объявления"})
 			return
 		}
 
@@ -441,17 +441,17 @@ func updatePublication(pool *pgxpool.Pool) gin.HandlerFunc {
 		var ownerID int64
 		err = pool.QueryRow(c, `SELECT user_id FROM publication WHERE id=$1`, pubID).Scan(&ownerID)
 		if err != nil {
-			c.JSON(http.StatusNotFound, gin.H{"error": "publication not found"})
+			c.JSON(http.StatusNotFound, gin.H{"error": "Объявление не найдено"})
 			return
 		}
 		if ownerID != uid {
-			c.JSON(http.StatusForbidden, gin.H{"error": "not your publication"})
+			c.JSON(http.StatusForbidden, gin.H{"error": "Это не ваше объявление"})
 			return
 		}
 
 		var in UpdatePubIn
 		if err := c.ShouldBindJSON(&in); err != nil {
-			c.JSON(http.StatusBadRequest, gin.H{"error": "bad json"})
+			c.JSON(http.StatusBadRequest, gin.H{"error": "Неверный формат данных"})
 			return
 		}
 
@@ -474,7 +474,7 @@ func requestContacts(pool *pgxpool.Pool) gin.HandlerFunc {
 		// Get user ID from context
 		userID, exists := c.Get(CtxDBUserID)
 		if !exists {
-			c.JSON(http.StatusUnauthorized, gin.H{"error": "not authenticated"})
+			c.JSON(http.StatusUnauthorized, gin.H{"error": "Требуется авторизация"})
 			return
 		}
 		requesterUID := userID.(int64)
@@ -484,14 +484,14 @@ func requestContacts(pool *pgxpool.Pool) gin.HandlerFunc {
 		var requesterUsername string
 		err := pool.QueryRow(c, `SELECT tg_user_id, COALESCE(tg_username, '') FROM app_user WHERE id=$1`, requesterUID).Scan(&requesterTGID, &requesterUsername)
 		if err != nil {
-			c.JSON(http.StatusInternalServerError, gin.H{"error": "user not found"})
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "Пользователь не найден"})
 			return
 		}
 
 		idStr := c.Param("id")
 		pubID, err := strconv.ParseInt(idStr, 10, 64)
 		if err != nil {
-			c.JSON(http.StatusBadRequest, gin.H{"error": "invalid id"})
+			c.JSON(http.StatusBadRequest, gin.H{"error": "Неверный идентификатор объявления"})
 			return
 		}
 
@@ -508,13 +508,13 @@ func requestContacts(pool *pgxpool.Pool) gin.HandlerFunc {
 			WHERE p.id=$1 AND p.is_active
 		`, pubID).Scan(&ownerUserID, &ownerTGID, &ownerUsername, &pubKind, &fromIATA, &toIATA)
 		if err != nil {
-			c.JSON(http.StatusNotFound, gin.H{"error": "publication not found"})
+			c.JSON(http.StatusNotFound, gin.H{"error": "Объявление не найдено"})
 			return
 		}
 
 		// Don't allow requesting own publication
 		if ownerUserID == requesterUID {
-			c.JSON(http.StatusForbidden, gin.H{"error": "cannot request contacts for own publication"})
+			c.JSON(http.StatusForbidden, gin.H{"error": "Нельзя запросить контакты к своему объявлению"})
 			return
 		}
 
@@ -538,7 +538,7 @@ func requestContacts(pool *pgxpool.Pool) gin.HandlerFunc {
 			`, pubID, requesterUID).Scan(&contactRequestID)
 			if err != nil {
 				log.Printf("[PUBLICATIONS] Contact request insert error: %v", err)
-				c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to create request"})
+				c.JSON(http.StatusInternalServerError, gin.H{"error": "Не удалось создать запрос. Попробуйте позже."})
 				return
 			}
 			isNewRequest = true
@@ -555,7 +555,7 @@ func requestContacts(pool *pgxpool.Pool) gin.HandlerFunc {
 		`, pubID).Scan(&pubFrom, &pubTo, &pubDescription, &pubItem, &pubWeight, &pubDate, &pubDateStart, &pubDateEnd)
 		if err != nil {
 			log.Printf("[PUBLICATIONS] Failed to get publication details: %v", err)
-			c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to get publication details"})
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "Не удалось получить данные объявления"})
 			return
 		}
 

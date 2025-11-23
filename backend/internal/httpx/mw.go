@@ -16,13 +16,13 @@ func WithUser(pool *pgxpool.Pool) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		raw := c.GetHeader("X-TG-User-ID")
 		if raw == "" {
-			c.AbortWithStatusJSON(http.StatusUnauthorized, gin.H{"error": "no tg user"})
+			c.AbortWithStatusJSON(http.StatusUnauthorized, gin.H{"error": "Требуется авторизация. Пожалуйста, войдите через Telegram."})
 			return
 		}
 		
 		tgUserID, err := strconv.ParseInt(raw, 10, 64)
 		if err != nil {
-			c.AbortWithStatusJSON(http.StatusUnauthorized, gin.H{"error": "bad tg id"})
+			c.AbortWithStatusJSON(http.StatusUnauthorized, gin.H{"error": "Неверный идентификатор пользователя. Пожалуйста, войдите заново."})
 			return
 		}
 		
@@ -34,7 +34,7 @@ func WithUser(pool *pgxpool.Pool) gin.HandlerFunc {
 			RETURNING id
 		`, tgUserID).Scan(&userID)
 		if err != nil {
-			c.AbortWithStatusJSON(http.StatusInternalServerError, gin.H{"error": "auth failed"})
+			c.AbortWithStatusJSON(http.StatusInternalServerError, gin.H{"error": "Ошибка авторизации. Попробуйте позже."})
 			return
 		}
 		

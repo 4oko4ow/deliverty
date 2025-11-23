@@ -75,7 +75,7 @@ func listAirports(pool *pgxpool.Pool) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		q := c.Query("q")
 		if q == "" {
-			c.JSON(http.StatusBadRequest, gin.H{"error": "query parameter 'q' is required"})
+			c.JSON(http.StatusBadRequest, gin.H{"error": "Требуется параметр запроса 'q'"})
 			return
 		}
 
@@ -101,7 +101,7 @@ func listAirports(pool *pgxpool.Pool) gin.HandlerFunc {
 			 ORDER BY iata LIMIT 20`, args...)
 		if err != nil {
 			log.Printf("ERROR: airports query failed: %v (query=%q)", err, q)
-			c.JSON(http.StatusInternalServerError, gin.H{"error": "db", "details": err.Error()})
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "Ошибка при поиске аэропортов. Попробуйте позже."})
 			return
 		}
 		defer rows.Close()
@@ -123,7 +123,7 @@ func listAirports(pool *pgxpool.Pool) gin.HandlerFunc {
 
 		if err := rows.Err(); err != nil {
 			log.Printf("ERROR: rows iteration error: %v", err)
-			c.JSON(http.StatusInternalServerError, gin.H{"error": "db", "details": err.Error()})
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "Ошибка при обработке результатов поиска. Попробуйте позже."})
 			return
 		}
 

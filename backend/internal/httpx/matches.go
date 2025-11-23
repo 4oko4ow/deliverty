@@ -52,7 +52,7 @@ func findMatches(pool *pgxpool.Pool) gin.HandlerFunc {
 
 		pubID, err := strconv.ParseInt(pubIDStr, 10, 64)
 		if err != nil {
-			c.JSON(http.StatusBadRequest, gin.H{"error": "invalid pub_id"})
+			c.JSON(http.StatusBadRequest, gin.H{"error": "Неверный идентификатор объявления"})
 			return
 		}
 
@@ -65,7 +65,7 @@ func findMatches(pool *pgxpool.Pool) gin.HandlerFunc {
 			FROM publication WHERE id=$1 AND is_active`, pubID).
 			Scan(&kind, &from, &to, &aStart, &aEnd, &aDate, &item, &weight)
 		if err != nil {
-			c.JSON(http.StatusNotFound, gin.H{"error": "pub not found"})
+			c.JSON(http.StatusNotFound, gin.H{"error": "Объявление не найдено или неактивно"})
 			return
 		}
 
@@ -78,7 +78,7 @@ func findMatches(pool *pgxpool.Pool) gin.HandlerFunc {
 			anchorStart = aStart.Time
 			anchorEnd = aEnd.Time
 		} else {
-			c.JSON(http.StatusBadRequest, gin.H{"error": "invalid date range"})
+			c.JSON(http.StatusBadRequest, gin.H{"error": "Неверный диапазон дат"})
 			return
 		}
 
@@ -156,7 +156,8 @@ func findMatches(pool *pgxpool.Pool) gin.HandlerFunc {
 			`, pubID, opp, from, to, anchorStart, anchorEnd, anchorUserID)
 		}
 		if err != nil {
-			c.JSON(http.StatusInternalServerError, gin.H{"error": "db"})
+			log.Printf("[MATCHES] Database error: %v", err)
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "Ошибка при поиске совпадений. Попробуйте позже."})
 			return
 		}
 		defer rows.Close()
@@ -232,19 +233,19 @@ func createDeal(pool *pgxpool.Pool) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		var in DealIn
 		if err := c.ShouldBindJSON(&in); err != nil {
-			c.JSON(http.StatusBadRequest, gin.H{"error": "bad json"})
+			c.JSON(http.StatusBadRequest, gin.H{"error": "Неверный формат данных"})
 			return
 		}
 
 		// Verify kinds
 		var k1, k2 string
 		if err := pool.QueryRow(c, `SELECT kind FROM publication WHERE id=$1 AND is_active`, in.RequestPubID).Scan(&k1); err != nil || k1 != "request" {
-			c.JSON(http.StatusBadRequest, gin.H{"error": "request_pub invalid"})
+			c.JSON(http.StatusBadRequest, gin.H{"error": "Неверное объявление запроса"})
 			return
 		}
 
 		if err := pool.QueryRow(c, `SELECT kind FROM publication WHERE id=$1 AND is_active`, in.TripPubID).Scan(&k2); err != nil || k2 != "trip" {
-			c.JSON(http.StatusBadRequest, gin.H{"error": "trip_pub invalid"})
+			c.JSON(http.StatusBadRequest, gin.H{"error": "Неверное объявление поездки"})
 			return
 		}
 
@@ -256,7 +257,8 @@ func createDeal(pool *pgxpool.Pool) gin.HandlerFunc {
 			RETURNING id
 		`, in.RequestPubID, in.TripPubID).Scan(&dealID)
 		if err != nil {
-			c.JSON(http.StatusConflict, gin.H{"error": "deal exists?"})
+			log.Printf("[DEAL] Create error: %v", err)
+			c.JSON(http.StatusConflict, gin.H{"error": "Не удалось создать сделку. Возможно, она уже существует."})
 			return
 		}
 

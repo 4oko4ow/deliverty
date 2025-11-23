@@ -16,7 +16,7 @@ func getUserProfile(pool *pgxpool.Pool) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		uid := c.GetString(CtxUserID)
 		if uid == "" {
-			c.JSON(http.StatusUnauthorized, gin.H{"error": "not authenticated"})
+			c.JSON(http.StatusUnauthorized, gin.H{"error": "Требуется авторизация"})
 			return
 		}
 
@@ -27,7 +27,7 @@ func getUserProfile(pool *pgxpool.Pool) gin.HandlerFunc {
 		`, uid).Scan(&profile.Username, &profile.Rating)
 
 		if err != nil {
-			c.JSON(http.StatusNotFound, gin.H{"error": "user not found"})
+			c.JSON(http.StatusNotFound, gin.H{"error": "Пользователь не найден"})
 			return
 		}
 

@@ -27,7 +27,7 @@ func dealDeepLink(pool *pgxpool.Pool) gin.HandlerFunc {
 		uid := c.GetString(CtxUserID)
 		if uid == "" {
 			log.Printf("[DEEPLINK] No user ID in context")
-			c.JSON(http.StatusUnauthorized, gin.H{"error": "not authenticated"})
+			c.JSON(http.StatusUnauthorized, gin.H{"error": "Требуется авторизация"})
 			return
 		}
 		
@@ -44,20 +44,20 @@ func dealDeepLink(pool *pgxpool.Pool) gin.HandlerFunc {
 
 		if err != nil {
 			log.Printf("[DEEPLINK] Database error: %v", err)
-			c.JSON(http.StatusInternalServerError, gin.H{"error": "database error"})
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "Ошибка базы данных"})
 			return
 		}
 		
 		if !ok {
 			log.Printf("[DEEPLINK] User %s is not a participant of deal %s", uid, dealID)
-			c.JSON(http.StatusForbidden, gin.H{"error": "not allowed"})
+			c.JSON(http.StatusForbidden, gin.H{"error": "У вас нет доступа к этой сделке"})
 			return
 		}
 
 		botName := os.Getenv("TG_BOT_NAME")
 		if botName == "" {
 			log.Printf("[DEEPLINK] TG_BOT_NAME not set")
-			c.JSON(http.StatusInternalServerError, gin.H{"error": "bot not configured"})
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "Бот не настроен"})
 			return
 		}
 		
@@ -82,12 +82,12 @@ func updateDealStatus(pool *pgxpool.Pool) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		var in statusIn
 		if err := c.ShouldBindJSON(&in); err != nil {
-			c.JSON(http.StatusBadRequest, gin.H{"error": "bad json"})
+			c.JSON(http.StatusBadRequest, gin.H{"error": "Неверный формат данных"})
 			return
 		}
 
 		if in.Status != "agreed" && in.Status != "handoff_done" && in.Status != "cancelled" {
-			c.JSON(http.StatusBadRequest, gin.H{"error": "bad status"})
+			c.JSON(http.StatusBadRequest, gin.H{"error": "Неверный статус"})
 			return
 		}
 
@@ -108,7 +108,7 @@ func updateDealStatus(pool *pgxpool.Pool) gin.HandlerFunc {
 
 		ct, err := pool.Exec(c, cmd, in.Status, dealID, uid)
 		if err != nil || ct.RowsAffected() == 0 {
-			c.JSON(http.StatusForbidden, gin.H{"error": "not allowed"})
+			c.JSON(http.StatusForbidden, gin.H{"error": "У вас нет доступа к этой сделке"})
 			return
 		}
 
@@ -124,7 +124,7 @@ func rateDeal(pool *pgxpool.Pool) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		var in rateIn
 		if err := c.ShouldBindJSON(&in); err != nil || in.Score != 1 {
-			c.JSON(http.StatusBadRequest, gin.H{"error": "bad score"})
+			c.JSON(http.StatusBadRequest, gin.H{"error": "Неверная оценка"})
 			return
 		}
 
@@ -154,7 +154,8 @@ func rateDeal(pool *pgxpool.Pool) gin.HandlerFunc {
 		`, dealID, uid)
 
 		if err != nil {
-			c.JSON(http.StatusInternalServerError, gin.H{"error": "rate failed"})
+			log.Printf("[DEAL] Rate error: %v", err)
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "Не удалось поставить оценку. Попробуйте позже."})
 			return
 		}
 
