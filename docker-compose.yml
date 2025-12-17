@@ -1,0 +1,115 @@
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: deliverty-db
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-postgres}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-postgres}
+      POSTGRES_DB: ${POSTGRES_DB:-deliverty}
+    ports:
+      - "${POSTGRES_PORT:-5432}:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: [ "CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-postgres}" ]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - deliverty-network
+    restart: unless-stopped
+    profiles:
+      - local-db
+
+  api:
+    build:
+      context: .
+      dockerfile: backend/Dockerfile
+    container_name: deliverty-api
+    environment:
+      PORT: ${PORT:-8080}
+      DATABASE_URL: ${DATABASE_URL:-postgresql://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD:-postgres}@postgres:5432/${POSTGRES_DB:-deliverty}?sslmode=disable}
+      TG_BOT_TOKEN: ${TG_BOT_TOKEN}
+      TG_BOT_NAME: ${TG_BOT_NAME}
+      TG_DEEPLINK_SECRET: ${TG_DEEPLINK_SECRET}
+      FRONTEND_URL: ${FRONTEND_URL}
+      ADMIN_SECRET_KEY: ${ADMIN_SECRET_KEY}
+      ADMIN_USER_IDS: ${ADMIN_USER_IDS}
+      GIN_MODE: ${GIN_MODE:-release}
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+    networks:
+      - deliverty-network
+      - traefik
+    restart: unless-stopped
+    healthcheck:
+      test: [ "CMD-SHELL", "wget --no-verbose --tries=1 --spider http://localhost:8080/healthz || exit 1" ]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 60s
+    labels:
+      - "traefik.enable=true"
+
+      # === Middleware для редиректа HTTP -> HTTPS ===
+      - "traefik.http.middlewares.deliverty-redirect-https.redirectscheme.scheme=https"
+      - "traefik.http.middlewares.deliverty-redirect-https.redirectscheme.permanent=true"
+
+      # === HTTPS API на /api (без strip prefix, backend ожидает /api/cities) ===
+      - "traefik.http.routers.deliverty-api.rule=Host(`deliverty.findparty.online`) && PathPrefix(`/api`)"
+      - "traefik.http.routers.deliverty-api.entrypoints=websecure"
+      - "traefik.http.routers.deliverty-api.tls.certresolver=le"
+      - "traefik.http.routers.deliverty-api.service=deliverty-api"
+      - "traefik.http.services.deliverty-api.loadbalancer.server.port=8080"
+
+      # === HTTP -> HTTPS редирект для /api ===
+      - "traefik.http.routers.deliverty-api-redirect.rule=Host(`deliverty.findparty.online`) && PathPrefix(`/api`)"
+      - "traefik.http.routers.deliverty-api-redirect.entrypoints=web"
+      - "traefik.http.routers.deliverty-api-redirect.middlewares=deliverty-redirect-https"
+
+      # === HTTPS Bot Webhook на /bot/webhook ===
+      - "traefik.http.routers.deliverty-bot.rule=Host(`deliverty.findparty.online`) && PathPrefix(`/bot`)"
+      - "traefik.http.routers.deliverty-bot.entrypoints=websecure"
+      - "traefik.http.routers.deliverty-bot.tls.certresolver=le"
+      - "traefik.http.routers.deliverty-bot.service=deliverty-bot"
+      - "traefik.http.services.deliverty-bot.loadbalancer.server.port=8080"
+
+      # === HTTP -> HTTPS редирект для /bot ===
+      - "traefik.http.routers.deliverty-bot-redirect.rule=Host(`deliverty.findparty.online`) && PathPrefix(`/bot`)"
+      - "traefik.http.routers.deliverty-bot-redirect.entrypoints=web"
+      - "traefik.http.routers.deliverty-bot-redirect.middlewares=deliverty-redirect-https"
+
+      # === Health endpoint (без /api префикса) ===
+      - "traefik.http.routers.deliverty-health.rule=Host(`deliverty.findparty.online`) && Path(`/healthz`)"
+      - "traefik.http.routers.deliverty-health.entrypoints=websecure"
+      - "traefik.http.routers.deliverty-health.tls.certresolver=le"
+      - "traefik.http.routers.deliverty-health.service=deliverty-health"
+      - "traefik.http.services.deliverty-health.loadbalancer.server.port=8080"
+
+      # === HTTP -> HTTPS редирект для /healthz ===
+      - "traefik.http.routers.deliverty-health-redirect.rule=Host(`deliverty.findparty.online`) && Path(`/healthz`)"
+      - "traefik.http.routers.deliverty-health-redirect.entrypoints=web"
+      - "traefik.http.routers.deliverty-health-redirect.middlewares=deliverty-redirect-https"
+
+  migrate:
+    build:
+      context: .
+      dockerfile: backend/Dockerfile.migrate
+    container_name: deliverty-migrate
+    environment:
+      DATABASE_URL: ${DATABASE_URL:-postgresql://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD:-postgres}@postgres:5432/${POSTGRES_DB:-deliverty}?sslmode=disable}
+    networks:
+      - deliverty-network
+    restart: "no"
+
+volumes:
+  postgres_data:
+    driver: local
+
+networks:
+  deliverty-network:
+    driver: bridge
+  traefik:
+    external: true
+
