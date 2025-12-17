@@ -1,0 +1,41 @@
+name: Deploy to Contabo
+
+on:
+  push:
+    branches:
+      - main
+    paths-ignore:
+      - 'frontend/**'
+      - '*.md'
+      - '.gitignore'
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v5
+
+      - name: Deploy via SSH
+        uses: appleboy/ssh-action@v1.2.4
+        with:
+          host: ${{ secrets.SSH_HOST }}
+          username: ${{ secrets.SSH_USER }}
+          key: ${{ secrets.SSH_KEY }}
+          port: ${{ secrets.SSH_PORT || 22 }}
+          script: |
+            cd /srv/apps/deliverty
+            git pull origin main
+
+            # Подтянуть образы (если когда-нибудь начнёшь пушить в регистр)
+            docker compose pull || true
+
+            # Пересобрать и запустить контейнеры
+            docker compose up -d --build
+
+            # Показать статус контейнеров
+            docker compose ps
+
+            # Показать последние логи API
+            docker compose logs --tail=50 api
