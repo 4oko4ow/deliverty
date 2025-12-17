@@ -3,11 +3,9 @@ name: Deploy to Contabo
 on:
   push:
     branches:
-      - main
+      - main    # или master, если у тебя так называется
     paths-ignore:
       - 'frontend/**'
-      - '*.md'
-      - '.gitignore'
 
 jobs:
   deploy:
@@ -23,19 +21,13 @@ jobs:
           host: ${{ secrets.SSH_HOST }}
           username: ${{ secrets.SSH_USER }}
           key: ${{ secrets.SSH_KEY }}
-          port: ${{ secrets.SSH_PORT || 22 }}
+          port: ${{ secrets.SSH_PORT }}
           script: |
             cd /srv/apps/deliverty
-            git pull origin main
+            git pull
 
-            # Подтянуть образы (если когда-нибудь начнёшь пушить в регистр)
+            # На всякий случай — подтянуть образы (если когда-нибудь начнёшь пушить в регистр)
             docker compose pull || true
 
-            # Пересобрать и запустить контейнеры
+            # Если хочешь всегда пересобирать всё:
             docker compose up -d --build
-
-            # Показать статус контейнеров
-            docker compose ps
-
-            # Показать последние логи API
-            docker compose logs --tail=50 api
