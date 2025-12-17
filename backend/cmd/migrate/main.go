@@ -32,3 +32,4 @@ func main() {
 
 	log.Println("Migrations completed successfully")
 }
+
