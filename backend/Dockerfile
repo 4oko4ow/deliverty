@@ -11,5 +11,7 @@ FROM gcr.io/distroless/base-debian12
 ENV HTTP_ADDR=:8080
 EXPOSE 8080
 COPY --from=build /api /api
+COPY --from=build /app/migrations /migrations
+ENV MIGRATIONS_DIR=/migrations
 ENTRYPOINT ["/api"]
 

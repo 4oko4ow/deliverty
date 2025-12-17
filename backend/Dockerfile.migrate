@@ -9,5 +9,7 @@ RUN CGO_ENABLED=0 go build -o /migrate ./cmd/migrate
 # run
 FROM gcr.io/distroless/base-debian12
 COPY --from=build /migrate /migrate
+COPY --from=build /app/migrations /migrations
+ENV MIGRATIONS_DIR=/migrations
 ENTRYPOINT ["/migrate"]
 
