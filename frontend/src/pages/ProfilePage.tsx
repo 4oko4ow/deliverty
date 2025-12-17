@@ -10,7 +10,7 @@ import {
   HiOutlineCheckCircle,
   HiOutlineXCircle
 } from "react-icons/hi";
-import { HiOutlineGift, HiOutlineTruck } from "react-icons/hi2";
+import { HiOutlineGift, HiOutlineTruck, HiOutlineArrowRightOnRectangle } from "react-icons/hi2";
 import { formatItem, formatWeight } from "../lib/translations";
 import { usePostHog } from "posthog-js/react";
 
@@ -152,6 +152,21 @@ export default function ProfilePage() {
       <div className="space-y-6 animate-fade-in">
         <div className="text-center space-y-2">
           <h1 className="text-2xl sm:text-3xl font-bold text-gray-900">Мои объявления</h1>
+        </div>
+
+        {/* Logout Button */}
+        <div className="flex justify-center">
+          <button
+            onClick={() => {
+              track("logout_clicked");
+              localStorage.removeItem("tg_uid");
+              navigate("/auth");
+            }}
+            className="btn btn-secondary flex items-center gap-2"
+          >
+            <HiOutlineArrowRightOnRectangle className="w-4 h-4" />
+            Выйти из профиля
+          </button>
         </div>
 
         {/* Publications List */}
