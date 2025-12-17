@@ -35,6 +35,8 @@ services:
       FRONTEND_URL: ${FRONTEND_URL}
       ADMIN_SECRET_KEY: ${ADMIN_SECRET_KEY}
       ADMIN_USER_IDS: ${ADMIN_USER_IDS}
+      POSTHOG_API_KEY: ${POSTHOG_API_KEY}
+      POSTHOG_HOST: ${POSTHOG_HOST}
       GIN_MODE: ${GIN_MODE:-release}
     depends_on:
       migrate:
@@ -43,12 +45,14 @@ services:
       - deliverty-network
       - traefik
     restart: unless-stopped
-    healthcheck:
-      test: [ "CMD-SHELL", "wget --no-verbose --tries=1 --spider http://localhost:8080/healthz || exit 1" ]
-      interval: 30s
-      timeout: 10s
-      retries: 3
-      start_period: 60s
+    # Healthcheck disabled - distroless image doesn't have shell utilities
+    # Traefik will handle health checks via /healthz endpoint
+    # healthcheck:
+    #   test: ["CMD", "wget", "--spider", "http://localhost:8080/healthz"]
+    #   interval: 30s
+    #   timeout: 10s
+    #   retries: 3
+    #   start_period: 60s
     labels:
       - "traefik.enable=true"
 
@@ -112,4 +116,3 @@ networks:
     driver: bridge
   traefik:
     external: true
-
