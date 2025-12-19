@@ -29,6 +29,8 @@ type Publication = {
     tg_user_id: number;
     tg_username: string;
     user_rating: number;
+    deal_count: number;
+    possible_matches_count: number;
 };
 
 type Deal = {
@@ -645,6 +647,8 @@ export default function AdminPage() {
                                                 <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Дата</th>
                                                 <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Пользователь</th>
                                                 <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Статус</th>
+                                                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Сделки</th>
+                                                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Возможные совпадения</th>
                                                 <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Действия</th>
                                             </tr>
                                         </thead>
@@ -674,6 +678,24 @@ export default function AdminPage() {
                                                         )}
                                                     </td>
                                                     <td className="px-4 py-3 whitespace-nowrap text-sm">
+                                                        {pub.deal_count > 0 ? (
+                                                            <span className="px-2 py-1 text-xs font-medium bg-blue-100 text-blue-800 rounded">
+                                                                {pub.deal_count} {pub.deal_count === 1 ? "сделка" : pub.deal_count < 5 ? "сделки" : "сделок"}
+                                                            </span>
+                                                        ) : (
+                                                            <span className="text-xs text-gray-400">Нет сделок</span>
+                                                        )}
+                                                    </td>
+                                                    <td className="px-4 py-3 whitespace-nowrap text-sm">
+                                                        {pub.possible_matches_count > 0 ? (
+                                                            <span className="px-2 py-1 text-xs font-medium bg-amber-100 text-amber-800 rounded">
+                                                                {pub.possible_matches_count} {pub.possible_matches_count === 1 ? "совпадение" : pub.possible_matches_count < 5 ? "совпадения" : "совпадений"}
+                                                            </span>
+                                                        ) : (
+                                                            <span className="text-xs text-gray-400">Нет</span>
+                                                        )}
+                                                    </td>
+                                                    <td className="px-4 py-3 whitespace-nowrap text-sm">
                                                         <button
                                                             onClick={() => {
                                                                 setSelectedPub(pub);
@@ -681,7 +703,7 @@ export default function AdminPage() {
                                                             }}
                                                             className="text-primary-600 hover:text-primary-800 font-medium"
                                                         >
-                                                            Найти совпадения
+                                                            {pub.deal_count > 0 ? "Просмотр" : "Найти совпадения"}
                                                         </button>
                                                     </td>
                                                 </tr>

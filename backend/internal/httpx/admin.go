@@ -273,9 +273,72 @@ func listAdminPublications(pool *pgxpool.Pool) gin.HandlerFunc {
 			       p.item, p.weight, p.reward_hint, p.description, p.flight_no, p.airline, 
 			       p.capacity_hint, p.is_active, p.created_at,
 			       u.id as user_id, u.tg_user_id, COALESCE(u.tg_username, '') as tg_username, 
-			       COALESCE(u.rating_small, 0) as rating
+			       COALESCE(u.rating_small, 0) as rating,
+			       COALESCE(deal_count.count, 0) as deal_count,
+			       COALESCE(possible_matches.count, 0) as possible_matches_count
 			FROM publication p
 			JOIN app_user u ON u.id = p.user_id
+			LEFT JOIN (
+				SELECT pub_id, COUNT(*) as count
+				FROM (
+					SELECT request_pub_id as pub_id FROM deal WHERE status != 'cancelled'
+					UNION ALL
+					SELECT trip_pub_id as pub_id FROM deal WHERE status != 'cancelled'
+				) all_deals
+				GROUP BY pub_id
+			) deal_count ON deal_count.pub_id = p.id
+			LEFT JOIN (
+				SELECT 
+					p1.id as pub_id,
+					COUNT(DISTINCT p2.id) as count
+				FROM publication p1
+				JOIN publication p2 ON (
+					p1.kind != p2.kind 
+					AND p1.is_active 
+					AND p2.is_active
+					AND p1.id != p2.id
+					AND (
+						(p1.from_iata = p2.from_iata) OR 
+						EXISTS (
+							SELECT 1 FROM airport a1, airport a2 
+							WHERE a1.iata = p1.from_iata 
+							AND a2.iata = p2.from_iata 
+							AND a1.city IS NOT NULL 
+							AND a2.city IS NOT NULL 
+							AND a1.city = a2.city
+						)
+					)
+					AND (
+						(p1.to_iata = p2.to_iata) OR 
+						EXISTS (
+							SELECT 1 FROM airport a1, airport a2 
+							WHERE a1.iata = p1.to_iata 
+							AND a2.iata = p2.to_iata 
+							AND a1.city IS NOT NULL 
+							AND a2.city IS NOT NULL 
+							AND a1.city = a2.city
+						)
+					)
+					AND (
+						(p1.kind = 'trip' AND p1.date IS NOT NULL AND p2.date_start IS NOT NULL AND p2.date_end IS NOT NULL
+							AND p1.date >= p2.date_start - INTERVAL '3 days' 
+							AND p1.date <= p2.date_end + INTERVAL '3 days'
+							AND NOT (p1.date >= p2.date_start AND p1.date <= p2.date_end))
+						OR
+						(p1.kind = 'request' AND p1.date_start IS NOT NULL AND p1.date_end IS NOT NULL AND p2.date IS NOT NULL
+							AND p2.date >= p1.date_start - INTERVAL '3 days' 
+							AND p2.date <= p1.date_end + INTERVAL '3 days'
+							AND NOT (p2.date >= p1.date_start AND p2.date <= p1.date_end))
+					)
+					AND NOT EXISTS (
+						SELECT 1 FROM deal d 
+						WHERE (d.request_pub_id = p1.id AND d.trip_pub_id = p2.id)
+						   OR (d.request_pub_id = p2.id AND d.trip_pub_id = p1.id)
+					)
+				)
+				WHERE p1.is_active
+				GROUP BY p1.id
+			) possible_matches ON possible_matches.pub_id = p.id
 			WHERE 1=1`
 		args := []any{}
 		argIdx := 1
@@ -318,26 +381,28 @@ func listAdminPublications(pool *pgxpool.Pool) gin.HandlerFunc {
 		defer rows.Close()
 
 		type Pub struct {
-			ID           int64   `json:"id"`
-			Kind         string  `json:"kind"`
-			From         string  `json:"from_iata"`
-			To           string  `json:"to_iata"`
-			DateStart    *string `json:"date_start,omitempty"`
-			DateEnd      *string `json:"date_end,omitempty"`
-			Date         *string `json:"date,omitempty"`
-			Item         string  `json:"item"`
-			Weight       string  `json:"weight"`
-			RewardHint   *int    `json:"reward_hint,omitempty"`
-			Description  string  `json:"description"`
-			FlightNo     *string `json:"flight_no,omitempty"`
-			Airline      *string `json:"airline,omitempty"`
-			CapacityHint *string `json:"capacity_hint,omitempty"`
-			IsActive     bool    `json:"is_active"`
-			CreatedAt    string  `json:"created_at"`
-			UserID       int64   `json:"user_id"`
-			TgUserID     int64   `json:"tg_user_id"`
-			TgUsername   string  `json:"tg_username"`
-			UserRating   int     `json:"user_rating"`
+			ID                   int64   `json:"id"`
+			Kind                 string  `json:"kind"`
+			From                 string  `json:"from_iata"`
+			To                   string  `json:"to_iata"`
+			DateStart            *string `json:"date_start,omitempty"`
+			DateEnd              *string `json:"date_end,omitempty"`
+			Date                 *string `json:"date,omitempty"`
+			Item                 string  `json:"item"`
+			Weight               string  `json:"weight"`
+			RewardHint           *int    `json:"reward_hint,omitempty"`
+			Description          string  `json:"description"`
+			FlightNo             *string `json:"flight_no,omitempty"`
+			Airline              *string `json:"airline,omitempty"`
+			CapacityHint         *string `json:"capacity_hint,omitempty"`
+			IsActive             bool    `json:"is_active"`
+			CreatedAt            string  `json:"created_at"`
+			UserID               int64   `json:"user_id"`
+			TgUserID             int64   `json:"tg_user_id"`
+			TgUsername           string  `json:"tg_username"`
+			UserRating           int     `json:"user_rating"`
+			DealCount            int     `json:"deal_count"`
+			PossibleMatchesCount int     `json:"possible_matches_count"`
 		}
 
 		out := []Pub{}
@@ -351,7 +416,8 @@ func listAdminPublications(pool *pgxpool.Pool) gin.HandlerFunc {
 			err := rows.Scan(&p.ID, &p.Kind, &p.From, &p.To, &ds, &de, &singleDate,
 				&p.Item, &p.Weight, &p.RewardHint, &p.Description, &p.FlightNo, &p.Airline,
 				&p.CapacityHint, &p.IsActive, &createdAt,
-				&p.UserID, &p.TgUserID, &p.TgUsername, &p.UserRating)
+				&p.UserID, &p.TgUserID, &p.TgUsername, &p.UserRating,
+				&p.DealCount, &p.PossibleMatchesCount)
 			if err != nil {
 				log.Printf("[ADMIN] Scan error: %v", err)
 				continue
