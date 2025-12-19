@@ -10,6 +10,7 @@ import BrowsePage from "./pages/BrowsePage";
 import AuthPage from "./pages/AuthPage";
 import ProfilePage from "./pages/ProfilePage";
 import AdminPage from "./pages/AdminPage";
+import PublicationPage from "./pages/PublicationPage";
 import PolicyFooter from "./components/PolicyFooter";
 import SupportBanner from "./components/SupportBanner";
 import Logo from "./components/Logo";
@@ -166,6 +167,7 @@ function App() {
                   <Route path="/publish" element={<PublishPage />} />
                   <Route path="/profile" element={<ProfilePage />} />
                   <Route path="/admin" element={<AdminPage />} />
+                  <Route path="/publication/:id" element={<PublicationPage />} />
                 </Routes>
                 <SupportBanner />
               </main>

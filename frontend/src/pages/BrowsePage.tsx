@@ -1128,74 +1128,92 @@ export default function BrowsePage() {
                       className="card-hover p-5 animate-slide-up touch-manipulation"
                       style={{ animationDelay: `${idx * 50}ms` }}
                     >
-                      <div className="flex items-start justify-between mb-3">
-                        <div className="flex items-center gap-2 flex-wrap">
-                          {r.kind === "request" ? (
-                            <span className="badge-primary">
-                              <HiOutlineGift className="w-3 h-3 sm:w-3 sm:h-3" />
-                              <span className="text-xs sm:text-xs">Ищу кто летит</span>
-                            </span>
-                          ) : (
-                            <span className="badge-success">
-                              <HiOutlineTruck className="w-3 h-3 sm:w-3 sm:h-3" />
-                              <span className="text-xs sm:text-xs">Лечу</span>
-                            </span>
-                          )}
-                          <UserRating rating={r.user_rating || 0} />
-                        </div>
-                      </div>
-
-                      <div className="flex items-center gap-2 sm:gap-3 mb-4">
-                        <div className="flex items-center gap-1.5 sm:gap-2">
-                          <div className="p-1.5 bg-primary-50 rounded-lg">
-                            <HiOutlineLocationMarker className="w-4 h-4 sm:w-4 sm:h-4 text-primary-600" />
+                      <div
+                        className="cursor-pointer"
+                        onClick={(e) => {
+                          // Don't navigate if clicking on button
+                          if ((e.target as HTMLElement).closest('button')) {
+                            return;
+                          }
+                          track("publication_card_clicked", {
+                            pub_id: r.id,
+                            pub_kind: r.kind,
+                            from_iata: r.from_iata,
+                            to_iata: r.to_iata,
+                          });
+                          navigate(`/publication/${r.id}`);
+                        }}
+                      >
+                        <div className="flex items-start justify-between mb-3">
+                          <div className="flex items-center gap-2 flex-wrap">
+                            {r.kind === "request" ? (
+                              <span className="badge-primary">
+                                <HiOutlineGift className="w-3 h-3 sm:w-3 sm:h-3" />
+                                <span className="text-xs sm:text-xs">Ищу кто летит</span>
+                              </span>
+                            ) : (
+                              <span className="badge-success">
+                                <HiOutlineTruck className="w-3 h-3 sm:w-3 sm:h-3" />
+                                <span className="text-xs sm:text-xs">Лечу</span>
+                              </span>
+                            )}
+                            <UserRating rating={r.user_rating || 0} />
                           </div>
-                          <span className="font-semibold text-gray-900 text-sm sm:text-base">{r.from_iata}</span>
                         </div>
-                        <HiArrowRight className="w-4 h-4 sm:w-5 sm:h-5 text-gray-400 flex-shrink-0" />
-                        <div className="flex items-center gap-1.5 sm:gap-2">
-                          <div className="p-1.5 bg-primary-50 rounded-lg">
-                            <HiOutlineLocationMarker className="w-4 h-4 sm:w-4 sm:h-4 text-primary-600" />
-                          </div>
-                          <span className="font-semibold text-gray-900 text-sm sm:text-base">{r.to_iata}</span>
-                        </div>
-                      </div>
 
-                      <div className="flex flex-col sm:flex-row sm:flex-wrap items-start sm:items-center gap-2 sm:gap-4 text-xs sm:text-sm text-gray-600 mb-4">
-                        <div className="flex items-center gap-1.5">
-                          <HiOutlineCalendar className="w-4 h-4 sm:w-4 sm:h-4 flex-shrink-0" />
-                          <span className="break-words">
-                            {r.kind === "trip" && r.date
-                              ? formatDate(r.date)
-                              : r.date_start && r.date_end
-                                ? `${formatDate(r.date_start)} – ${formatDate(r.date_end)}`
-                                : ""}
-                          </span>
-                        </div>
-                        <div className="flex items-center gap-1.5">
-                          <HiOutlineCube className="w-4 h-4 sm:w-4 sm:h-4 flex-shrink-0" />
-                          <span>{formatItem(r.item)}</span>
-                          <span className="text-gray-400">•</span>
-                          <span>{formatWeight(r.weight)}</span>
-                        </div>
-                      </div>
-
-                      {(() => {
-                        const desc = r.description || r.desc || "";
-                        if (desc && String(desc).trim()) {
-                          return (
-                            <div className="mb-4 pt-3 border-t border-gray-100">
-                              <p className="text-sm text-gray-700 whitespace-pre-wrap line-clamp-3">{String(desc)}</p>
+                        <div className="flex items-center gap-2 sm:gap-3 mb-4">
+                          <div className="flex items-center gap-1.5 sm:gap-2">
+                            <div className="p-1.5 bg-primary-50 rounded-lg">
+                              <HiOutlineLocationMarker className="w-4 h-4 sm:w-4 sm:h-4 text-primary-600" />
                             </div>
-                          );
-                        }
-                        return null;
-                      })()}
+                            <span className="font-semibold text-gray-900 text-sm sm:text-base">{r.from_iata}</span>
+                          </div>
+                          <HiArrowRight className="w-4 h-4 sm:w-5 sm:h-5 text-gray-400 flex-shrink-0" />
+                          <div className="flex items-center gap-1.5 sm:gap-2">
+                            <div className="p-1.5 bg-primary-50 rounded-lg">
+                              <HiOutlineLocationMarker className="w-4 h-4 sm:w-4 sm:h-4 text-primary-600" />
+                            </div>
+                            <span className="font-semibold text-gray-900 text-sm sm:text-base">{r.to_iata}</span>
+                          </div>
+                        </div>
+
+                        <div className="flex flex-col sm:flex-row sm:flex-wrap items-start sm:items-center gap-2 sm:gap-4 text-xs sm:text-sm text-gray-600 mb-4">
+                          <div className="flex items-center gap-1.5">
+                            <HiOutlineCalendar className="w-4 h-4 sm:w-4 sm:h-4 flex-shrink-0" />
+                            <span className="break-words">
+                              {r.kind === "trip" && r.date
+                                ? formatDate(r.date)
+                                : r.date_start && r.date_end
+                                  ? `${formatDate(r.date_start)} – ${formatDate(r.date_end)}`
+                                  : ""}
+                            </span>
+                          </div>
+                          <div className="flex items-center gap-1.5">
+                            <HiOutlineCube className="w-4 h-4 sm:w-4 sm:h-4 flex-shrink-0" />
+                            <span>{formatItem(r.item)}</span>
+                            <span className="text-gray-400">•</span>
+                            <span>{formatWeight(r.weight)}</span>
+                          </div>
+                        </div>
+
+                        {(() => {
+                          const desc = r.description || r.desc || "";
+                          if (desc && String(desc).trim()) {
+                            return (
+                              <div className="mb-4 pt-3 border-t border-gray-100">
+                                <p className="text-sm text-gray-700 whitespace-pre-wrap line-clamp-3">{String(desc)}</p>
+                              </div>
+                            );
+                          }
+                          return null;
+                        })()}
+                      </div>
 
                       <div className="flex items-center justify-end pt-4 border-t border-gray-100">
                         <button
                           className="btn btn-primary"
-                          onClick={async () => {
+                          onClick={async (e) => {
+                            e.stopPropagation(); // Prevent card click
                             track("request_contacts_clicked", {
                               pub_id: r.id,
                               pub_kind: r.kind,

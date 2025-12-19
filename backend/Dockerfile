@@ -15,3 +15,4 @@ COPY --from=build /app/migrations /migrations
 ENV MIGRATIONS_DIR=/migrations
 ENTRYPOINT ["/api"]
 
+
