@@ -3,8 +3,8 @@ import AirportInput from "../components/AirportInput";
 import SEO from "../components/SEO";
 import { api, isAuthenticated } from "../lib/api";
 import { useNavigate } from "react-router-dom";
-import { HiOutlineCalendar, HiOutlineCube, HiOutlineExclamationCircle, HiOutlineUser, HiOutlineCheckCircle, HiOutlineXCircle } from "react-icons/hi";
-import { HiOutlineGift, HiOutlineTruck, HiOutlineViewGrid, HiOutlineHandshake } from "react-icons/hi2";
+import { HiOutlineCalendar, HiOutlineCube, HiOutlineExclamationCircle, HiOutlineUser, HiOutlineCheckCircle, HiOutlineXCircle, HiOutlineUserGroup } from "react-icons/hi";
+import { HiOutlineGift, HiOutlineTruck, HiOutlineViewGrid } from "react-icons/hi2";
 
 type Tab = "create" | "publications" | "deals";
 
@@ -324,8 +324,8 @@ export default function AdminPage() {
                         <button
                             onClick={() => setActiveTab("create")}
                             className={`py-4 px-1 border-b-2 font-medium text-sm ${activeTab === "create"
-                                    ? "border-primary-500 text-primary-600"
-                                    : "border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300"
+                                ? "border-primary-500 text-primary-600"
+                                : "border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300"
                                 }`}
                         >
                             <HiOutlineGift className="w-5 h-5 inline mr-2" />
@@ -334,8 +334,8 @@ export default function AdminPage() {
                         <button
                             onClick={() => setActiveTab("publications")}
                             className={`py-4 px-1 border-b-2 font-medium text-sm ${activeTab === "publications"
-                                    ? "border-primary-500 text-primary-600"
-                                    : "border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300"
+                                ? "border-primary-500 text-primary-600"
+                                : "border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300"
                                 }`}
                         >
                             <HiOutlineViewGrid className="w-5 h-5 inline mr-2" />
@@ -344,11 +344,11 @@ export default function AdminPage() {
                         <button
                             onClick={() => setActiveTab("deals")}
                             className={`py-4 px-1 border-b-2 font-medium text-sm ${activeTab === "deals"
-                                    ? "border-primary-500 text-primary-600"
-                                    : "border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300"
+                                ? "border-primary-500 text-primary-600"
+                                : "border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300"
                                 }`}
                         >
-                            <HiOutlineHandshake className="w-5 h-5 inline mr-2" />
+                            <HiOutlineUserGroup className="w-5 h-5 inline mr-2" />
                             Сделки
                         </button>
                     </nav>
@@ -383,8 +383,8 @@ export default function AdminPage() {
                                     type="button"
                                     onClick={() => setKind("request")}
                                     className={`p-4 rounded-lg border-2 transition-all touch-manipulation min-h-[110px] ${kind === "request"
-                                            ? "border-primary-500 bg-primary-50"
-                                            : "border-gray-200 hover:border-gray-300 active:bg-gray-50"
+                                        ? "border-primary-500 bg-primary-50"
+                                        : "border-gray-200 hover:border-gray-300 active:bg-gray-50"
                                         }`}
                                 >
                                     <div className="flex flex-col items-center gap-2 justify-center mb-2">
@@ -401,8 +401,8 @@ export default function AdminPage() {
                                     type="button"
                                     onClick={() => setKind("trip")}
                                     className={`p-4 rounded-lg border-2 transition-all touch-manipulation min-h-[110px] ${kind === "trip"
-                                            ? "border-primary-500 bg-primary-50"
-                                            : "border-gray-200 hover:border-gray-300 active:bg-gray-50"
+                                        ? "border-primary-500 bg-primary-50"
+                                        : "border-gray-200 hover:border-gray-300 active:bg-gray-50"
                                         }`}
                                 >
                                     <div className="flex flex-col items-center gap-2 justify-center mb-2">
