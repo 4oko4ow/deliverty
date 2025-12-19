@@ -1,0 +1,3 @@
+-- 009_add_user_blocked.sql
+ALTER TABLE app_user
+ADD COLUMN IF NOT EXISTS is_blocked BOOLEAN NOT NULL DEFAULT FALSE;

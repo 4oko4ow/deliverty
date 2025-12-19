@@ -224,12 +224,13 @@ export const api = {
     }, 15000);
   },
 
-  listAdminPubs: async (params?: { kind?: string; from?: string; to?: string; is_active?: boolean; limit?: number }) => {
+  listAdminPubs: async (params?: { kind?: string; from?: string; to?: string; is_active?: boolean; search?: string; limit?: number }) => {
     const searchParams = new URLSearchParams();
     if (params?.kind) searchParams.append("kind", params.kind);
     if (params?.from) searchParams.append("from", params.from);
     if (params?.to) searchParams.append("to", params.to);
     if (params?.is_active !== undefined) searchParams.append("is_active", params.is_active.toString());
+    if (params?.search) searchParams.append("search", params.search);
     if (params?.limit) searchParams.append("limit", params.limit.toString());
     return apiCall(`${BASE}/admin/publications?${searchParams.toString()}`, {
       headers: tgHeader()
@@ -253,18 +254,131 @@ export const api = {
     }, 15000);
   },
 
-  listAdminDeals: async (params?: { status?: string; limit?: number }) => {
+  listAdminDeals: async (params?: { status?: string; from?: string; to?: string; from_date?: string; to_date?: string; search?: string; limit?: number }) => {
     const searchParams = new URLSearchParams();
     if (params?.status) searchParams.append("status", params.status);
+    if (params?.from) searchParams.append("from", params.from);
+    if (params?.to) searchParams.append("to", params.to);
+    if (params?.from_date) searchParams.append("from_date", params.from_date);
+    if (params?.to_date) searchParams.append("to_date", params.to_date);
+    if (params?.search) searchParams.append("search", params.search);
     if (params?.limit) searchParams.append("limit", params.limit.toString());
     return apiCall(`${BASE}/admin/deals?${searchParams.toString()}`, {
       headers: tgHeader()
     }, 10000);
   },
 
+  getAdminDeal: async (id: number) => {
+    return apiCall(`${BASE}/admin/deals/${id}`, {
+      headers: tgHeader()
+    }, 8000);
+  },
+
+  updateAdminDeal: async (id: number, status: string) => {
+    return apiCall(`${BASE}/admin/deals/${id}`, {
+      method: "PATCH",
+      headers: {
+        "Content-Type": "application/json",
+        ...tgHeader()
+      },
+      body: JSON.stringify({ status }),
+    }, 15000);
+  },
+
   getAdminMatches: async (pubId: number) => {
     return apiCall(`${BASE}/admin/matches/${pubId}`, {
       headers: tgHeader()
     }, 10000);
+  },
+
+  getAdminStats: async () => {
+    return apiCall(`${BASE}/admin/stats`, {
+      headers: tgHeader()
+    }, 10000);
+  },
+
+  updateAdminPub: async (id: number, data: any) => {
+    return apiCall(`${BASE}/admin/publications/${id}`, {
+      method: "PATCH",
+      headers: {
+        "Content-Type": "application/json",
+        ...tgHeader()
+      },
+      body: JSON.stringify(data),
+    }, 15000);
+  },
+
+  bulkUpdateAdminPubs: async (ids: number[], action: "activate" | "deactivate") => {
+    return apiCall(`${BASE}/admin/publications/bulk-update`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        ...tgHeader()
+      },
+      body: JSON.stringify({ ids, action }),
+    }, 15000);
+  },
+
+  listAdminUsers: async (params?: { username?: string; tg_user_id?: string; limit?: number; offset?: number }) => {
+    const searchParams = new URLSearchParams();
+    if (params?.username) searchParams.append("username", params.username);
+    if (params?.tg_user_id) searchParams.append("tg_user_id", params.tg_user_id);
+    if (params?.limit) searchParams.append("limit", params.limit.toString());
+    if (params?.offset) searchParams.append("offset", params.offset.toString());
+    return apiCall(`${BASE}/admin/users?${searchParams.toString()}`, {
+      headers: tgHeader()
+    }, 10000);
+  },
+
+  getAdminUser: async (id: number) => {
+    return apiCall(`${BASE}/admin/users/${id}`, {
+      headers: tgHeader()
+    }, 8000);
+  },
+
+  updateAdminUser: async (id: number, data: { is_blocked?: boolean }) => {
+    return apiCall(`${BASE}/admin/users/${id}`, {
+      method: "PATCH",
+      headers: {
+        "Content-Type": "application/json",
+        ...tgHeader()
+      },
+      body: JSON.stringify(data),
+    }, 15000);
+  },
+
+  getAdminAnalyticsIssues: async () => {
+    return apiCall(`${BASE}/admin/analytics/issues`, {
+      headers: tgHeader()
+    }, 10000);
+  },
+
+  exportAdminData: async (type: "publications" | "deals", format: "csv" | "json", filters?: any) => {
+    const searchParams = new URLSearchParams();
+    searchParams.append("type", type);
+    searchParams.append("format", format);
+    if (filters?.kind) searchParams.append("kind", filters.kind);
+    if (filters?.status) searchParams.append("status", filters.status);
+
+    const response = await fetch(`${BASE}/admin/analytics/export?${searchParams.toString()}`, {
+      headers: tgHeader() as any,
+    });
+
+    if (!response.ok) {
+      const error = await response.json().catch(() => ({ error: "Ошибка экспорта" }));
+      return error;
+    }
+
+    const blob = await response.blob();
+    const url = window.URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `${type}_${new Date().toISOString().split("T")[0]}.${format}`;
+    document.body.appendChild(a);
+    a.click();
+    window.URL.revokeObjectURL(url);
+    document.body.removeChild(a);
+
+    return { ok: true };
   },
 };

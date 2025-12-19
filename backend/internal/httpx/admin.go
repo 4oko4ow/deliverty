@@ -260,6 +260,7 @@ func listAdminPublications(pool *pgxpool.Pool) gin.HandlerFunc {
 		from := c.Query("from")             // IATA code
 		to := c.Query("to")                 // IATA code
 		isActiveStr := c.Query("is_active") // true | false | "" (all)
+		search := c.Query("search")         // поиск по ID, username, описанию
 		limitStr := c.Query("limit")
 		limit := 100
 		if limitStr != "" {
@@ -368,6 +369,18 @@ func listAdminPublications(pool *pgxpool.Pool) gin.HandlerFunc {
 			argIdx++
 		}
 
+		if search != "" {
+			// Поиск по ID, username, описанию
+			searchPattern := "%" + search + "%"
+			qry += fmt.Sprintf(` AND (
+				p.id::text LIKE $%d OR
+				u.tg_username ILIKE $%d OR
+				p.description ILIKE $%d
+			)`, argIdx, argIdx, argIdx)
+			args = append(args, searchPattern)
+			argIdx++
+		}
+
 		qry += " ORDER BY p.created_at DESC"
 		qry += fmt.Sprintf(" LIMIT $%d", argIdx)
 		args = append(args, limit)
@@ -438,6 +451,221 @@ func listAdminPublications(pool *pgxpool.Pool) gin.HandlerFunc {
 		}
 
 		c.JSON(http.StatusOK, out)
+	}
+}
+
+// updateAdminPublication обновляет публикацию
+func updateAdminPublication(pool *pgxpool.Pool) gin.HandlerFunc {
+	return func(c *gin.Context) {
+		idStr := c.Param("id")
+		id, err := strconv.ParseInt(idStr, 10, 64)
+		if err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "неверный идентификатор"})
+			return
+		}
+
+		type UpdatePubIn struct {
+			FromIATA     *string `json:"from_iata,omitempty"`
+			ToIATA       *string `json:"to_iata,omitempty"`
+			DateStart    *string `json:"date_start,omitempty"`
+			DateEnd      *string `json:"date_end,omitempty"`
+			Date         *string `json:"date,omitempty"`
+			Item         *string `json:"item,omitempty"`
+			Weight       *string `json:"weight,omitempty"`
+			RewardHint   *int    `json:"reward_hint,omitempty"`
+			Description  *string `json:"description,omitempty"`
+			FlightNo     *string `json:"flight_no,omitempty"`
+			Airline      *string `json:"airline,omitempty"`
+			CapacityHint *string `json:"capacity_hint,omitempty"`
+			IsActive     *bool   `json:"is_active,omitempty"`
+		}
+
+		var in UpdatePubIn
+		if err := c.ShouldBindJSON(&in); err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "неверный формат данных"})
+			return
+		}
+
+		// Проверка существования публикации
+		var currentKind string
+		err = pool.QueryRow(c, `SELECT kind FROM publication WHERE id=$1`, id).Scan(&currentKind)
+		if err != nil {
+			if errors.Is(err, pgx.ErrNoRows) {
+				c.JSON(http.StatusNotFound, gin.H{"error": "публикация не найдена"})
+				return
+			}
+			log.Printf("[ADMIN] Update publication error: %v", err)
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "ошибка базы данных"})
+			return
+		}
+
+		// Валидация описания
+		if in.Description != nil {
+			if contactsRe.MatchString(*in.Description) {
+				c.JSON(http.StatusBadRequest, gin.H{"error": "контакты не разрешены в описании"})
+				return
+			}
+			if len(*in.Description) > 500 {
+				c.JSON(http.StatusBadRequest, gin.H{"error": "описание слишком длинное (≤500)"})
+				return
+			}
+			if hasBannedItem(*in.Description) {
+				c.JSON(http.StatusBadRequest, gin.H{"error": "предмет не разрешен политикой"})
+				return
+			}
+		}
+
+		// Построение запроса обновления
+		updates := []string{}
+		args := []any{}
+		argIdx := 1
+
+		if in.FromIATA != nil {
+			if len(*in.FromIATA) != 3 {
+				c.JSON(http.StatusBadRequest, gin.H{"error": "неверный код аэропорта отправления"})
+				return
+			}
+			updates = append(updates, fmt.Sprintf("from_iata = $%d", argIdx))
+			args = append(args, *in.FromIATA)
+			argIdx++
+		}
+
+		if in.ToIATA != nil {
+			if len(*in.ToIATA) != 3 {
+				c.JSON(http.StatusBadRequest, gin.H{"error": "неверный код аэропорта назначения"})
+				return
+			}
+			updates = append(updates, fmt.Sprintf("to_iata = $%d", argIdx))
+			args = append(args, *in.ToIATA)
+			argIdx++
+		}
+
+		if in.DateStart != nil {
+			updates = append(updates, fmt.Sprintf("date_start = $%d", argIdx))
+			args = append(args, *in.DateStart)
+			argIdx++
+		}
+
+		if in.DateEnd != nil {
+			updates = append(updates, fmt.Sprintf("date_end = $%d", argIdx))
+			args = append(args, *in.DateEnd)
+			argIdx++
+		}
+
+		if in.Date != nil {
+			updates = append(updates, fmt.Sprintf("date = $%d", argIdx))
+			args = append(args, *in.Date)
+			argIdx++
+		}
+
+		if in.Item != nil {
+			updates = append(updates, fmt.Sprintf("item = $%d::item_type", argIdx))
+			args = append(args, *in.Item)
+			argIdx++
+		}
+
+		if in.Weight != nil {
+			updates = append(updates, fmt.Sprintf("weight = $%d::weight_band", argIdx))
+			args = append(args, *in.Weight)
+			argIdx++
+		}
+
+		if in.RewardHint != nil {
+			updates = append(updates, fmt.Sprintf("reward_hint = $%d", argIdx))
+			args = append(args, *in.RewardHint)
+			argIdx++
+		}
+
+		if in.Description != nil {
+			updates = append(updates, fmt.Sprintf("description = $%d", argIdx))
+			args = append(args, *in.Description)
+			argIdx++
+		}
+
+		if in.FlightNo != nil {
+			updates = append(updates, fmt.Sprintf("flight_no = $%d", argIdx))
+			args = append(args, *in.FlightNo)
+			argIdx++
+		}
+
+		if in.Airline != nil {
+			updates = append(updates, fmt.Sprintf("airline = $%d", argIdx))
+			args = append(args, *in.Airline)
+			argIdx++
+		}
+
+		if in.CapacityHint != nil {
+			updates = append(updates, fmt.Sprintf("capacity_hint = $%d", argIdx))
+			args = append(args, *in.CapacityHint)
+			argIdx++
+		}
+
+		if in.IsActive != nil {
+			updates = append(updates, fmt.Sprintf("is_active = $%d", argIdx))
+			args = append(args, *in.IsActive)
+			argIdx++
+		}
+
+		if len(updates) == 0 {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "нет полей для обновления"})
+			return
+		}
+
+		args = append(args, id)
+		qry := fmt.Sprintf("UPDATE publication SET %s WHERE id = $%d", strings.Join(updates, ", "), argIdx)
+
+		_, err = pool.Exec(c, qry, args...)
+		if err != nil {
+			log.Printf("[ADMIN] Update publication error: %v", err)
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "ошибка обновления"})
+			return
+		}
+
+		c.JSON(http.StatusOK, gin.H{"ok": true})
+	}
+}
+
+// bulkUpdateAdminPublications выполняет массовые действия над публикациями
+func bulkUpdateAdminPublications(pool *pgxpool.Pool) gin.HandlerFunc {
+	return func(c *gin.Context) {
+		type BulkUpdateIn struct {
+			IDs    []int64 `json:"ids" binding:"required"`
+			Action string  `json:"action" binding:"required"` // "activate" | "deactivate"
+		}
+
+		var in BulkUpdateIn
+		if err := c.ShouldBindJSON(&in); err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "неверный формат данных"})
+			return
+		}
+
+		if len(in.IDs) == 0 {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "список ID пуст"})
+			return
+		}
+
+		if in.Action != "activate" && in.Action != "deactivate" {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "неверное действие. Используйте 'activate' или 'deactivate'"})
+			return
+		}
+
+		isActive := in.Action == "activate"
+
+		_, err := pool.Exec(c, `
+			UPDATE publication 
+			SET is_active = $1 
+			WHERE id = ANY($2)
+		`, isActive, in.IDs)
+		if err != nil {
+			log.Printf("[ADMIN] Bulk update error: %v", err)
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "ошибка массового обновления"})
+			return
+		}
+
+		c.JSON(http.StatusOK, gin.H{
+			"ok":      true,
+			"updated": len(in.IDs),
+		})
 	}
 }
 
@@ -643,10 +871,150 @@ func createAdminDeal(pool *pgxpool.Pool) gin.HandlerFunc {
 	}
 }
 
+// updateAdminDeal обновляет статус сделки
+func updateAdminDeal(pool *pgxpool.Pool) gin.HandlerFunc {
+	return func(c *gin.Context) {
+		idStr := c.Param("id")
+		id, err := strconv.ParseInt(idStr, 10, 64)
+		if err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "неверный идентификатор"})
+			return
+		}
+
+		type UpdateDealIn struct {
+			Status string `json:"status" binding:"required"` // new | agreed | handoff_done | cancelled
+		}
+
+		var in UpdateDealIn
+		if err := c.ShouldBindJSON(&in); err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "неверный формат данных"})
+			return
+		}
+
+		validStatuses := map[string]bool{"new": true, "agreed": true, "handoff_done": true, "cancelled": true}
+		if !validStatuses[in.Status] {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "неверный статус"})
+			return
+		}
+
+		_, err = pool.Exec(c, `UPDATE deal SET status = $1 WHERE id = $2`, in.Status, id)
+		if err != nil {
+			log.Printf("[ADMIN] Update deal error: %v", err)
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "ошибка обновления"})
+			return
+		}
+
+		c.JSON(http.StatusOK, gin.H{"ok": true})
+	}
+}
+
+// getAdminDeal возвращает детали сделки
+func getAdminDeal(pool *pgxpool.Pool) gin.HandlerFunc {
+	return func(c *gin.Context) {
+		idStr := c.Param("id")
+		id, err := strconv.ParseInt(idStr, 10, 64)
+		if err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "неверный идентификатор"})
+			return
+		}
+
+		type DealDetail struct {
+			ID               int64   `json:"id"`
+			Status           string  `json:"status"`
+			CreatedAt        string  `json:"created_at"`
+			LastMessageAt    *string `json:"last_message_at,omitempty"`
+			RequestPubID     int64   `json:"request_pub_id"`
+			RequestFrom      string  `json:"request_from"`
+			RequestTo        string  `json:"request_to"`
+			RequestDateStart *string `json:"request_date_start,omitempty"`
+			RequestDateEnd   *string `json:"request_date_end,omitempty"`
+			RequestDate      *string `json:"request_date,omitempty"`
+			RequestTgUserID  int64   `json:"request_tg_user_id"`
+			RequestUsername  string  `json:"request_username"`
+			RequestRating    int     `json:"request_rating"`
+			TripPubID        int64   `json:"trip_pub_id"`
+			TripFrom         string  `json:"trip_from"`
+			TripTo           string  `json:"trip_to"`
+			TripDate         *string `json:"trip_date,omitempty"`
+			TripTgUserID     int64   `json:"trip_tg_user_id"`
+			TripUsername     string  `json:"trip_username"`
+			TripRating       int     `json:"trip_rating"`
+		}
+
+		var d DealDetail
+		var createdAt time.Time
+		var lastMessageAt sql.NullTime
+		var reqDateStart, reqDateEnd sql.NullTime
+		var reqDate, tripDate sql.NullTime
+
+		err = pool.QueryRow(c, `
+			SELECT d.id, d.status, d.created_at, d.last_message_at,
+			       pr.id as request_pub_id, pr.from_iata as request_from, pr.to_iata as request_to,
+			       pr.date_start as request_date_start, pr.date_end as request_date_end, pr.date as request_date,
+			       ur.tg_user_id as request_tg_user_id, COALESCE(ur.tg_username, '') as request_username,
+			       COALESCE(ur.rating_small, 0) as request_rating,
+			       pt.id as trip_pub_id, pt.from_iata as trip_from, pt.to_iata as trip_to,
+			       pt.date as trip_date,
+			       ut.tg_user_id as trip_tg_user_id, COALESCE(ut.tg_username, '') as trip_username,
+			       COALESCE(ut.rating_small, 0) as trip_rating
+			FROM deal d
+			JOIN publication pr ON pr.id = d.request_pub_id
+			JOIN app_user ur ON ur.id = pr.user_id
+			JOIN publication pt ON pt.id = d.trip_pub_id
+			JOIN app_user ut ON ut.id = pt.user_id
+			WHERE d.id = $1
+		`, id).Scan(&d.ID, &d.Status, &createdAt, &lastMessageAt,
+			&d.RequestPubID, &d.RequestFrom, &d.RequestTo,
+			&reqDateStart, &reqDateEnd, &reqDate,
+			&d.RequestTgUserID, &d.RequestUsername, &d.RequestRating,
+			&d.TripPubID, &d.TripFrom, &d.TripTo,
+			&tripDate,
+			&d.TripTgUserID, &d.TripUsername, &d.TripRating)
+
+		if err != nil {
+			if errors.Is(err, pgx.ErrNoRows) {
+				c.JSON(http.StatusNotFound, gin.H{"error": "сделка не найдена"})
+				return
+			}
+			log.Printf("[ADMIN] Get deal error: %v", err)
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "ошибка базы данных"})
+			return
+		}
+
+		d.CreatedAt = createdAt.Format(time.RFC3339)
+		if lastMessageAt.Valid {
+			lmStr := lastMessageAt.Time.Format(time.RFC3339)
+			d.LastMessageAt = &lmStr
+		}
+
+		if reqDate.Valid {
+			dateStr := reqDate.Time.Format("2006-01-02")
+			d.RequestDate = &dateStr
+		} else if reqDateStart.Valid && reqDateEnd.Valid {
+			dsStr := reqDateStart.Time.Format("2006-01-02")
+			deStr := reqDateEnd.Time.Format("2006-01-02")
+			d.RequestDateStart = &dsStr
+			d.RequestDateEnd = &deStr
+		}
+
+		if tripDate.Valid {
+			dateStr := tripDate.Time.Format("2006-01-02")
+			d.TripDate = &dateStr
+		}
+
+		c.JSON(http.StatusOK, d)
+	}
+}
+
 // listAdminDeals возвращает список всех сделок
 func listAdminDeals(pool *pgxpool.Pool) gin.HandlerFunc {
 	return func(c *gin.Context) {
-		status := c.Query("status") // new | agreed | handoff_done | cancelled | "" (all)
+		status := c.Query("status")      // new | agreed | handoff_done | cancelled | "" (all)
+		from := c.Query("from")          // IATA code
+		to := c.Query("to")              // IATA code
+		fromDate := c.Query("from_date") // YYYY-MM-DD
+		toDate := c.Query("to_date")     // YYYY-MM-DD
+		search := c.Query("search")      // поиск по ID сделки или ID публикации
 		limitStr := c.Query("limit")
 		limit := 100
 		if limitStr != "" {
@@ -675,6 +1043,43 @@ func listAdminDeals(pool *pgxpool.Pool) gin.HandlerFunc {
 		if status != "" {
 			qry += fmt.Sprintf(" AND d.status = $%d::deal_status", argIdx)
 			args = append(args, status)
+			argIdx++
+		}
+
+		if from != "" {
+			qry += fmt.Sprintf(" AND (pr.from_iata = $%d OR pt.from_iata = $%d)", argIdx, argIdx)
+			args = append(args, from)
+			argIdx++
+		}
+
+		if to != "" {
+			qry += fmt.Sprintf(" AND (pr.to_iata = $%d OR pt.to_iata = $%d)", argIdx, argIdx)
+			args = append(args, to)
+			argIdx++
+		}
+
+		if fromDate != "" {
+			qry += fmt.Sprintf(" AND d.created_at >= $%d::date", argIdx)
+			args = append(args, fromDate)
+			argIdx++
+		}
+
+		if toDate != "" {
+			qry += fmt.Sprintf(" AND d.created_at <= $%d::date + INTERVAL '1 day'", argIdx)
+			args = append(args, toDate)
+			argIdx++
+		}
+
+		if search != "" {
+			searchPattern := "%" + search + "%"
+			qry += fmt.Sprintf(` AND (
+				d.id::text LIKE $%d OR
+				pr.id::text LIKE $%d OR
+				pt.id::text LIKE $%d OR
+				ur.tg_username ILIKE $%d OR
+				ut.tg_username ILIKE $%d
+			)`, argIdx, argIdx, argIdx, argIdx, argIdx)
+			args = append(args, searchPattern)
 			argIdx++
 		}
 
@@ -928,16 +1333,1023 @@ func getAdminMatches(pool *pgxpool.Pool) gin.HandlerFunc {
 	}
 }
 
+// getAdminStats возвращает общую статистику для дашборда
+func getAdminStats(pool *pgxpool.Pool) gin.HandlerFunc {
+	return func(c *gin.Context) {
+		type Stats struct {
+			ActivePublications struct {
+				Requests int `json:"requests"`
+				Trips    int `json:"trips"`
+				Total    int `json:"total"`
+			} `json:"active_publications"`
+			Deals struct {
+				New         int `json:"new"`
+				Agreed      int `json:"agreed"`
+				HandoffDone int `json:"handoff_done"`
+				Cancelled   int `json:"cancelled"`
+				Total       int `json:"total"`
+			} `json:"deals"`
+			Users struct {
+				Today int `json:"today"`
+				Week  int `json:"week"`
+				Month int `json:"month"`
+				Total int `json:"total"`
+			} `json:"users"`
+			PopularRoutes []struct {
+				FromIATA string `json:"from_iata"`
+				ToIATA   string `json:"to_iata"`
+				FromCity string `json:"from_city"`
+				ToCity   string `json:"to_city"`
+				Count    int    `json:"count"`
+			} `json:"popular_routes"`
+			ConversionRate float64 `json:"conversion_rate"` // публикации → сделки
+			DailyStats     []struct {
+				Date         string `json:"date"`
+				Publications int    `json:"publications"`
+				Deals        int    `json:"deals"`
+			} `json:"daily_stats"`
+			Alerts struct {
+				PublicationsNoMatches []struct {
+					ID        int64  `json:"id"`
+					Kind      string `json:"kind"`
+					From      string `json:"from_iata"`
+					To        string `json:"to_iata"`
+					CreatedAt string `json:"created_at"`
+					DaysOld   int    `json:"days_old"`
+				} `json:"publications_no_matches"`
+				InactiveUsers []struct {
+					ID           int64  `json:"id"`
+					TgUsername   string `json:"tg_username"`
+					LastActive   string `json:"last_active"`
+					DaysInactive int    `json:"days_inactive"`
+				} `json:"inactive_users"`
+				DealsNoActivity []struct {
+					ID             int64   `json:"id"`
+					Status         string  `json:"status"`
+					CreatedAt      string  `json:"created_at"`
+					LastMessageAt  *string `json:"last_message_at,omitempty"`
+					DaysNoActivity int     `json:"days_no_activity"`
+				} `json:"deals_no_activity"`
+			} `json:"alerts"`
+		}
+
+		var stats Stats
+		// Инициализация слайсов алертов
+		stats.Alerts.PublicationsNoMatches = []struct {
+			ID        int64  `json:"id"`
+			Kind      string `json:"kind"`
+			From      string `json:"from_iata"`
+			To        string `json:"to_iata"`
+			CreatedAt string `json:"created_at"`
+			DaysOld   int    `json:"days_old"`
+		}{}
+		stats.Alerts.InactiveUsers = []struct {
+			ID           int64  `json:"id"`
+			TgUsername   string `json:"tg_username"`
+			LastActive   string `json:"last_active"`
+			DaysInactive int    `json:"days_inactive"`
+		}{}
+		stats.Alerts.DealsNoActivity = []struct {
+			ID             int64   `json:"id"`
+			Status         string  `json:"status"`
+			CreatedAt      string  `json:"created_at"`
+			LastMessageAt  *string `json:"last_message_at,omitempty"`
+			DaysNoActivity int     `json:"days_no_activity"`
+		}{}
+
+		// Активные публикации
+		err := pool.QueryRow(c, `
+			SELECT 
+				COUNT(*) FILTER (WHERE kind = 'request' AND is_active) as requests,
+				COUNT(*) FILTER (WHERE kind = 'trip' AND is_active) as trips,
+				COUNT(*) FILTER (WHERE is_active) as total
+			FROM publication
+		`).Scan(&stats.ActivePublications.Requests, &stats.ActivePublications.Trips, &stats.ActivePublications.Total)
+		if err != nil {
+			log.Printf("[ADMIN] Stats error (publications): %v", err)
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "ошибка получения статистики"})
+			return
+		}
+
+		// Сделки по статусам
+		err = pool.QueryRow(c, `
+			SELECT 
+				COUNT(*) FILTER (WHERE status = 'new') as new,
+				COUNT(*) FILTER (WHERE status = 'agreed') as agreed,
+				COUNT(*) FILTER (WHERE status = 'handoff_done') as handoff_done,
+				COUNT(*) FILTER (WHERE status = 'cancelled') as cancelled,
+				COUNT(*) as total
+			FROM deal
+		`).Scan(&stats.Deals.New, &stats.Deals.Agreed, &stats.Deals.HandoffDone, &stats.Deals.Cancelled, &stats.Deals.Total)
+		if err != nil {
+			log.Printf("[ADMIN] Stats error (deals): %v", err)
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "ошибка получения статистики"})
+			return
+		}
+
+		// Пользователи
+		err = pool.QueryRow(c, `
+			SELECT 
+				COUNT(*) FILTER (WHERE created_at >= CURRENT_DATE) as today,
+				COUNT(*) FILTER (WHERE created_at >= CURRENT_DATE - INTERVAL '7 days') as week,
+				COUNT(*) FILTER (WHERE created_at >= CURRENT_DATE - INTERVAL '30 days') as month,
+				COUNT(*) as total
+			FROM app_user
+		`).Scan(&stats.Users.Today, &stats.Users.Week, &stats.Users.Month, &stats.Users.Total)
+		if err != nil {
+			log.Printf("[ADMIN] Stats error (users): %v", err)
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "ошибка получения статистики"})
+			return
+		}
+
+		// Популярные маршруты (топ-10)
+		rows, err := pool.Query(c, `
+			WITH route_cities AS (
+				SELECT 
+					p.from_iata,
+					p.to_iata,
+					COALESCE(a_from.city_ru, a_from.city) as from_city,
+					COALESCE(a_to.city_ru, a_to.city) as to_city,
+					COALESCE(a_from.city_ru, a_from.city, a_from.name) as from_city_display,
+					COALESCE(a_to.city_ru, a_to.city, a_to.name) as to_city_display
+				FROM publication p
+				LEFT JOIN airport a_from ON a_from.iata = p.from_iata
+				LEFT JOIN airport a_to ON a_to.iata = p.to_iata
+				WHERE p.is_active
+					AND (a_from.city_ru IS NOT NULL OR a_from.city IS NOT NULL)
+					AND (a_to.city_ru IS NOT NULL OR a_to.city IS NOT NULL)
+			)
+			SELECT 
+				MAX(from_iata) as from_iata,
+				MAX(to_iata) as to_iata,
+				COUNT(*) as count,
+				MAX(from_city_display) as from_city,
+				MAX(to_city_display) as to_city
+			FROM route_cities
+			GROUP BY from_city, to_city
+			HAVING COUNT(*) > 0
+			ORDER BY count DESC
+			LIMIT 10
+		`)
+		if err != nil {
+			log.Printf("[ADMIN] Stats error (routes): %v", err)
+		} else {
+			defer rows.Close()
+			for rows.Next() {
+				var route struct {
+					FromIATA string
+					ToIATA   string
+					FromCity string
+					ToCity   string
+					Count    int
+				}
+				if err := rows.Scan(&route.FromIATA, &route.ToIATA, &route.Count, &route.FromCity, &route.ToCity); err == nil {
+					stats.PopularRoutes = append(stats.PopularRoutes, struct {
+						FromIATA string `json:"from_iata"`
+						ToIATA   string `json:"to_iata"`
+						FromCity string `json:"from_city"`
+						ToCity   string `json:"to_city"`
+						Count    int    `json:"count"`
+					}{
+						FromIATA: route.FromIATA,
+						ToIATA:   route.ToIATA,
+						FromCity: route.FromCity,
+						ToCity:   route.ToCity,
+						Count:    route.Count,
+					})
+				}
+			}
+		}
+
+		// Конверсия: публикации → сделки
+		var totalPubs, totalDeals int
+		err = pool.QueryRow(c, `
+			SELECT 
+				(SELECT COUNT(*) FROM publication WHERE is_active) as pubs,
+				(SELECT COUNT(DISTINCT request_pub_id) + COUNT(DISTINCT trip_pub_id) FROM deal WHERE status != 'cancelled') as deals
+		`).Scan(&totalPubs, &totalDeals)
+		if err == nil && totalPubs > 0 {
+			stats.ConversionRate = float64(totalDeals) / float64(totalPubs) * 100
+		}
+
+		// Алерты: публикации без совпадений >7 дней
+		rows, err = pool.Query(c, `
+			SELECT p.id, p.kind, p.from_iata, p.to_iata, p.created_at,
+			       EXTRACT(DAY FROM now() - p.created_at)::int as days_old
+			FROM publication p
+			WHERE p.is_active
+			  AND p.created_at < now() - INTERVAL '7 days'
+			  AND NOT EXISTS (
+			    SELECT 1 FROM deal d
+			    WHERE (d.request_pub_id = p.id OR d.trip_pub_id = p.id)
+			      AND d.status != 'cancelled'
+			  )
+			  AND NOT EXISTS (
+			    SELECT 1 FROM publication p2
+			    WHERE p2.id != p.id
+			      AND p2.is_active
+			      AND p2.kind != p.kind
+			      AND (
+			        (p2.from_iata = p.from_iata OR EXISTS (
+			          SELECT 1 FROM airport a1, airport a2
+			          WHERE a1.iata = p.from_iata AND a2.iata = p2.from_iata
+			          AND a1.city IS NOT NULL AND a2.city IS NOT NULL AND a1.city = a2.city
+			        ))
+			        AND (p2.to_iata = p.to_iata OR EXISTS (
+			          SELECT 1 FROM airport a1, airport a2
+			          WHERE a1.iata = p.to_iata AND a2.iata = p2.to_iata
+			          AND a1.city IS NOT NULL AND a2.city IS NOT NULL AND a1.city = a2.city
+			        ))
+			        AND (
+			          (p.kind = 'trip' AND p.date IS NOT NULL AND p2.date_start IS NOT NULL AND p2.date_end IS NOT NULL
+			           AND p.date >= p2.date_start AND p.date <= p2.date_end)
+			          OR
+			          (p.kind = 'request' AND p.date_start IS NOT NULL AND p.date_end IS NOT NULL AND p2.date IS NOT NULL
+			           AND p2.date >= p.date_start AND p2.date <= p.date_end)
+			        )
+			      )
+			  )
+			ORDER BY p.created_at ASC
+			LIMIT 10
+		`)
+		if err == nil {
+			defer rows.Close()
+			for rows.Next() {
+				var alert struct {
+					ID        int64
+					Kind      string
+					From      string
+					To        string
+					CreatedAt time.Time
+					DaysOld   int
+				}
+				if err := rows.Scan(&alert.ID, &alert.Kind, &alert.From, &alert.To, &alert.CreatedAt, &alert.DaysOld); err == nil {
+					stats.Alerts.PublicationsNoMatches = append(stats.Alerts.PublicationsNoMatches, struct {
+						ID        int64  `json:"id"`
+						Kind      string `json:"kind"`
+						From      string `json:"from_iata"`
+						To        string `json:"to_iata"`
+						CreatedAt string `json:"created_at"`
+						DaysOld   int    `json:"days_old"`
+					}{
+						ID:        alert.ID,
+						Kind:      alert.Kind,
+						From:      alert.From,
+						To:        alert.To,
+						CreatedAt: alert.CreatedAt.Format(time.RFC3339),
+						DaysOld:   alert.DaysOld,
+					})
+				}
+			}
+		}
+
+		// Алерты: неактивные пользователи (>30 дней)
+		rows, err = pool.Query(c, `
+			SELECT u.id, COALESCE(u.tg_username, '') as tg_username,
+			       COALESCE(MAX(p.created_at), u.created_at) as last_active,
+			       EXTRACT(DAY FROM now() - COALESCE(MAX(p.created_at), u.created_at))::int as days_inactive
+			FROM app_user u
+			LEFT JOIN publication p ON p.user_id = u.id
+			GROUP BY u.id, u.tg_username, u.created_at
+			HAVING EXTRACT(DAY FROM now() - COALESCE(MAX(p.created_at), u.created_at)) > 30
+			ORDER BY days_inactive DESC
+			LIMIT 10
+		`)
+		if err == nil {
+			defer rows.Close()
+			for rows.Next() {
+				var alert struct {
+					ID           int64
+					TgUsername   string
+					LastActive   time.Time
+					DaysInactive int
+				}
+				if err := rows.Scan(&alert.ID, &alert.TgUsername, &alert.LastActive, &alert.DaysInactive); err == nil {
+					stats.Alerts.InactiveUsers = append(stats.Alerts.InactiveUsers, struct {
+						ID           int64  `json:"id"`
+						TgUsername   string `json:"tg_username"`
+						LastActive   string `json:"last_active"`
+						DaysInactive int    `json:"days_inactive"`
+					}{
+						ID:           alert.ID,
+						TgUsername:   alert.TgUsername,
+						LastActive:   alert.LastActive.Format(time.RFC3339),
+						DaysInactive: alert.DaysInactive,
+					})
+				}
+			}
+		}
+
+		// Алерты: сделки без активности >3 дней
+		rows, err = pool.Query(c, `
+			SELECT d.id, d.status, d.created_at, d.last_message_at,
+			       EXTRACT(DAY FROM now() - COALESCE(d.last_message_at, d.created_at))::int as days_no_activity
+			FROM deal d
+			WHERE d.status IN ('new', 'agreed')
+			  AND EXTRACT(DAY FROM now() - COALESCE(d.last_message_at, d.created_at)) > 3
+			ORDER BY days_no_activity DESC
+			LIMIT 10
+		`)
+		if err == nil {
+			defer rows.Close()
+			for rows.Next() {
+				var alert struct {
+					ID             int64
+					Status         string
+					CreatedAt      time.Time
+					LastMessageAt  sql.NullTime
+					DaysNoActivity int
+				}
+				if err := rows.Scan(&alert.ID, &alert.Status, &alert.CreatedAt, &alert.LastMessageAt, &alert.DaysNoActivity); err == nil {
+					var lastMsgAt *string
+					if alert.LastMessageAt.Valid {
+						str := alert.LastMessageAt.Time.Format(time.RFC3339)
+						lastMsgAt = &str
+					}
+					stats.Alerts.DealsNoActivity = append(stats.Alerts.DealsNoActivity, struct {
+						ID             int64   `json:"id"`
+						Status         string  `json:"status"`
+						CreatedAt      string  `json:"created_at"`
+						LastMessageAt  *string `json:"last_message_at,omitempty"`
+						DaysNoActivity int     `json:"days_no_activity"`
+					}{
+						ID:             alert.ID,
+						Status:         alert.Status,
+						CreatedAt:      alert.CreatedAt.Format(time.RFC3339),
+						LastMessageAt:  lastMsgAt,
+						DaysNoActivity: alert.DaysNoActivity,
+					})
+				}
+			}
+		}
+
+		// Динамика за последние 30 дней
+		rows, err = pool.Query(c, `
+			WITH date_series AS (
+				SELECT generate_series(CURRENT_DATE - INTERVAL '29 days', CURRENT_DATE, INTERVAL '1 day')::date as date
+			),
+			pub_stats AS (
+				SELECT DATE(created_at) as date, COUNT(*) as count
+				FROM publication
+				WHERE created_at >= CURRENT_DATE - INTERVAL '30 days'
+				GROUP BY DATE(created_at)
+			),
+			deal_stats AS (
+				SELECT DATE(created_at) as date, COUNT(*) as count
+				FROM deal
+				WHERE created_at >= CURRENT_DATE - INTERVAL '30 days'
+				GROUP BY DATE(created_at)
+			)
+			SELECT 
+				ds.date,
+				COALESCE(p.count, 0) as publications,
+				COALESCE(d.count, 0) as deals
+			FROM date_series ds
+			LEFT JOIN pub_stats p ON p.date = ds.date
+			LEFT JOIN deal_stats d ON d.date = ds.date
+			ORDER BY ds.date DESC
+		`)
+		if err != nil {
+			log.Printf("[ADMIN] Stats error (daily): %v", err)
+		} else {
+			defer rows.Close()
+			for rows.Next() {
+				var daily struct {
+					Date         time.Time
+					Publications int
+					Deals        int
+				}
+				if err := rows.Scan(&daily.Date, &daily.Publications, &daily.Deals); err == nil {
+					stats.DailyStats = append(stats.DailyStats, struct {
+						Date         string `json:"date"`
+						Publications int    `json:"publications"`
+						Deals        int    `json:"deals"`
+					}{
+						Date:         daily.Date.Format("2006-01-02"),
+						Publications: daily.Publications,
+						Deals:        daily.Deals,
+					})
+				}
+			}
+		}
+
+		c.JSON(http.StatusOK, stats)
+	}
+}
+
 // RegisterAdminRoutes регистрирует админ-роуты
 func RegisterAdminRoutes(g *gin.RouterGroup, pool *pgxpool.Pool) {
 	admin := g.Group("/admin")
 	admin.Use(WithAdmin())
 	{
+		admin.GET("/stats", getAdminStats(pool))
 		admin.POST("/publications", createAdminPublication(pool))
 		admin.GET("/publications", listAdminPublications(pool))
 		admin.GET("/publications/:id", getAdminPublication(pool))
+		admin.PATCH("/publications/:id", updateAdminPublication(pool))
+		admin.POST("/publications/bulk-update", bulkUpdateAdminPublications(pool))
 		admin.POST("/deals", createAdminDeal(pool))
 		admin.GET("/deals", listAdminDeals(pool))
+		admin.GET("/deals/:id", getAdminDeal(pool))
+		admin.PATCH("/deals/:id", updateAdminDeal(pool))
 		admin.GET("/matches/:pub_id", getAdminMatches(pool))
+		admin.GET("/users", listAdminUsers(pool))
+		admin.GET("/users/:id", getAdminUser(pool))
+		admin.PATCH("/users/:id", updateAdminUser(pool))
+		admin.GET("/analytics/issues", getAdminAnalyticsIssues(pool))
+		admin.GET("/analytics/export", exportAdminData(pool))
+	}
+}
+
+// getAdminAnalyticsIssues возвращает проблемные публикации
+func getAdminAnalyticsIssues(pool *pgxpool.Pool) gin.HandlerFunc {
+	return func(c *gin.Context) {
+		type Issue struct {
+			Type        string `json:"type"` // "duplicate" | "no_matches" | "multiple_deals"
+			Publication struct {
+				ID         int64  `json:"id"`
+				Kind       string `json:"kind"`
+				From       string `json:"from_iata"`
+				To         string `json:"to_iata"`
+				DateStart  string `json:"date_start,omitempty"`
+				DateEnd    string `json:"date_end,omitempty"`
+				Date       string `json:"date,omitempty"`
+				UserID     int64  `json:"user_id"`
+				TgUsername string `json:"tg_username"`
+				CreatedAt  string `json:"created_at"`
+			} `json:"publication"`
+			Count int `json:"count,omitempty"` // для duplicate и multiple_deals
+		}
+
+		out := []Issue{}
+
+		// Дубликаты (одинаковые маршрут/даты/пользователь за последний час)
+		rows, err := pool.Query(c, `
+			SELECT p.id, p.kind, p.from_iata, p.to_iata, p.date_start, p.date_end, p.date,
+			       p.user_id, COALESCE(u.tg_username, '') as tg_username, p.created_at,
+			       COUNT(*) as dup_count
+			FROM publication p
+			JOIN app_user u ON u.id = p.user_id
+			WHERE p.is_active
+			  AND p.created_at > now() - INTERVAL '1 hour'
+			GROUP BY p.id, p.kind, p.from_iata, p.to_iata, p.date_start, p.date_end, p.date,
+			         p.user_id, u.tg_username, p.created_at
+			HAVING COUNT(*) > 1
+			ORDER BY dup_count DESC, p.created_at DESC
+			LIMIT 20
+		`)
+		if err == nil {
+			defer rows.Close()
+			for rows.Next() {
+				var i Issue
+				var p Issue
+				var ds, de sql.NullTime
+				var singleDate sql.NullTime
+				var createdAt time.Time
+				if err := rows.Scan(&p.Publication.ID, &p.Publication.Kind, &p.Publication.From, &p.Publication.To,
+					&ds, &de, &singleDate, &p.Publication.UserID, &p.Publication.TgUsername, &createdAt, &i.Count); err == nil {
+					if p.Publication.Kind == "trip" && singleDate.Valid {
+						p.Publication.Date = singleDate.Time.Format("2006-01-02")
+					} else if ds.Valid && de.Valid {
+						p.Publication.DateStart = ds.Time.Format("2006-01-02")
+						p.Publication.DateEnd = de.Time.Format("2006-01-02")
+					}
+					p.Publication.CreatedAt = createdAt.Format(time.RFC3339)
+					p.Type = "duplicate"
+					out = append(out, p)
+				}
+			}
+		}
+
+		// Публикации без совпадений >7 дней
+		rows, err = pool.Query(c, `
+			SELECT p.id, p.kind, p.from_iata, p.to_iata, p.date_start, p.date_end, p.date,
+			       p.user_id, COALESCE(u.tg_username, '') as tg_username, p.created_at
+			FROM publication p
+			JOIN app_user u ON u.id = p.user_id
+			WHERE p.is_active
+			  AND p.created_at < now() - INTERVAL '7 days'
+			  AND NOT EXISTS (
+			    SELECT 1 FROM deal d
+			    WHERE (d.request_pub_id = p.id OR d.trip_pub_id = p.id)
+			      AND d.status != 'cancelled'
+			  )
+			  AND NOT EXISTS (
+			    SELECT 1 FROM publication p2
+			    WHERE p2.id != p.id
+			      AND p2.is_active
+			      AND p2.kind != p.kind
+			      AND (
+			        (p2.from_iata = p.from_iata OR EXISTS (
+			          SELECT 1 FROM airport a1, airport a2
+			          WHERE a1.iata = p.from_iata AND a2.iata = p2.from_iata
+			          AND a1.city IS NOT NULL AND a2.city IS NOT NULL AND a1.city = a2.city
+			        ))
+			        AND (p2.to_iata = p.to_iata OR EXISTS (
+			          SELECT 1 FROM airport a1, airport a2
+			          WHERE a1.iata = p.to_iata AND a2.iata = p2.to_iata
+			          AND a1.city IS NOT NULL AND a2.city IS NOT NULL AND a1.city = a2.city
+			        ))
+			        AND (
+			          (p.kind = 'trip' AND p.date IS NOT NULL AND p2.date_start IS NOT NULL AND p2.date_end IS NOT NULL
+			           AND p.date >= p2.date_start AND p.date <= p2.date_end)
+			          OR
+			          (p.kind = 'request' AND p.date_start IS NOT NULL AND p.date_end IS NOT NULL AND p2.date IS NOT NULL
+			           AND p2.date >= p.date_start AND p2.date <= p.date_end)
+			        )
+			      )
+			  )
+			ORDER BY p.created_at DESC
+			LIMIT 20
+		`)
+		if err == nil {
+			defer rows.Close()
+			for rows.Next() {
+				var i Issue
+				var ds, de sql.NullTime
+				var singleDate sql.NullTime
+				var createdAt time.Time
+				if err := rows.Scan(&i.Publication.ID, &i.Publication.Kind, &i.Publication.From, &i.Publication.To,
+					&ds, &de, &singleDate, &i.Publication.UserID, &i.Publication.TgUsername, &createdAt); err == nil {
+					if i.Publication.Kind == "trip" && singleDate.Valid {
+						i.Publication.Date = singleDate.Time.Format("2006-01-02")
+					} else if ds.Valid && de.Valid {
+						i.Publication.DateStart = ds.Time.Format("2006-01-02")
+						i.Publication.DateEnd = de.Time.Format("2006-01-02")
+					}
+					i.Publication.CreatedAt = createdAt.Format(time.RFC3339)
+					i.Type = "no_matches"
+					out = append(out, i)
+				}
+			}
+		}
+
+		// Публикации с множественными сделками (>3)
+		rows, err = pool.Query(c, `
+			SELECT p.id, p.kind, p.from_iata, p.to_iata, p.date_start, p.date_end, p.date,
+			       p.user_id, COALESCE(u.tg_username, '') as tg_username, p.created_at,
+			       COUNT(DISTINCT d.id) as deal_count
+			FROM publication p
+			JOIN app_user u ON u.id = p.user_id
+			LEFT JOIN deal d ON (d.request_pub_id = p.id OR d.trip_pub_id = p.id)
+			WHERE p.is_active
+			GROUP BY p.id, p.kind, p.from_iata, p.to_iata, p.date_start, p.date_end, p.date,
+			         p.user_id, u.tg_username, p.created_at
+			HAVING COUNT(DISTINCT d.id) > 3
+			ORDER BY deal_count DESC, p.created_at DESC
+			LIMIT 20
+		`)
+		if err == nil {
+			defer rows.Close()
+			for rows.Next() {
+				var i Issue
+				var ds, de sql.NullTime
+				var singleDate sql.NullTime
+				var createdAt time.Time
+				if err := rows.Scan(&i.Publication.ID, &i.Publication.Kind, &i.Publication.From, &i.Publication.To,
+					&ds, &de, &singleDate, &i.Publication.UserID, &i.Publication.TgUsername, &createdAt, &i.Count); err == nil {
+					if i.Publication.Kind == "trip" && singleDate.Valid {
+						i.Publication.Date = singleDate.Time.Format("2006-01-02")
+					} else if ds.Valid && de.Valid {
+						i.Publication.DateStart = ds.Time.Format("2006-01-02")
+						i.Publication.DateEnd = de.Time.Format("2006-01-02")
+					}
+					i.Publication.CreatedAt = createdAt.Format(time.RFC3339)
+					i.Type = "multiple_deals"
+					out = append(out, i)
+				}
+			}
+		}
+
+		c.JSON(http.StatusOK, out)
+	}
+}
+
+// exportAdminData экспортирует данные в CSV или JSON
+func exportAdminData(pool *pgxpool.Pool) gin.HandlerFunc {
+	return func(c *gin.Context) {
+		dataType := c.Query("type") // "publications" | "deals"
+		format := c.Query("format") // "csv" | "json"
+		kind := c.Query("kind")     // для публикаций: "request" | "trip" | ""
+		status := c.Query("status") // для сделок: "new" | "agreed" | ...
+
+		if dataType != "publications" && dataType != "deals" {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "type должен быть 'publications' или 'deals'"})
+			return
+		}
+
+		if format != "csv" && format != "json" {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "format должен быть 'csv' или 'json'"})
+			return
+		}
+
+		if format == "csv" {
+			c.Header("Content-Type", "text/csv; charset=utf-8")
+			c.Header("Content-Disposition", fmt.Sprintf("attachment; filename=%s_%s.csv", dataType, time.Now().Format("20060102_150405")))
+		} else {
+			c.Header("Content-Type", "application/json; charset=utf-8")
+			c.Header("Content-Disposition", fmt.Sprintf("attachment; filename=%s_%s.json", dataType, time.Now().Format("20060102_150405")))
+		}
+
+		if dataType == "publications" {
+			// Экспорт публикаций
+			qry := `
+				SELECT p.id, p.kind, p.from_iata, p.to_iata, p.date_start, p.date_end, p.date,
+				       p.item, p.weight, p.description, p.is_active, p.created_at,
+				       u.tg_user_id, COALESCE(u.tg_username, '') as tg_username
+				FROM publication p
+				JOIN app_user u ON u.id = p.user_id
+				WHERE 1=1`
+			args := []any{}
+
+			if kind != "" {
+				qry += " AND p.kind = $1::pub_type"
+				args = append(args, kind)
+			}
+
+			qry += " ORDER BY p.created_at DESC LIMIT 10000"
+
+			rows, err := pool.Query(c, qry, args...)
+			if err != nil {
+				log.Printf("[ADMIN] Export publications error: %v", err)
+				c.JSON(http.StatusInternalServerError, gin.H{"error": "ошибка экспорта"})
+				return
+			}
+			defer rows.Close()
+
+			if format == "csv" {
+				c.Writer.WriteString("ID,Kind,From,To,DateStart,DateEnd,Date,Item,Weight,Description,IsActive,CreatedAt,UserID,Username\n")
+				for rows.Next() {
+					var id int64
+					var k, f, t, it, w, desc string
+					var ds, de sql.NullTime
+					var singleDate sql.NullTime
+					var isActive bool
+					var createdAt time.Time
+					var tgUserID int64
+					var username string
+					if err := rows.Scan(&id, &k, &f, &t, &ds, &de, &singleDate, &it, &w, &desc, &isActive, &createdAt, &tgUserID, &username); err == nil {
+						dateStr := ""
+						dateStartStr := ""
+						dateEndStr := ""
+						if k == "trip" && singleDate.Valid {
+							dateStr = singleDate.Time.Format("2006-01-02")
+						} else if ds.Valid && de.Valid {
+							dateStartStr = ds.Time.Format("2006-01-02")
+							dateEndStr = de.Time.Format("2006-01-02")
+						}
+						c.Writer.WriteString(fmt.Sprintf("%d,%s,%s,%s,%s,%s,%s,%s,%s,\"%s\",%v,%s,%d,%s\n",
+							id, k, f, t, dateStartStr, dateEndStr, dateStr, it, w, desc, isActive,
+							createdAt.Format(time.RFC3339), tgUserID, username))
+					}
+				}
+			} else {
+				type PubExport struct {
+					ID          int64   `json:"id"`
+					Kind        string  `json:"kind"`
+					From        string  `json:"from_iata"`
+					To          string  `json:"to_iata"`
+					DateStart   *string `json:"date_start,omitempty"`
+					DateEnd     *string `json:"date_end,omitempty"`
+					Date        *string `json:"date,omitempty"`
+					Item        string  `json:"item"`
+					Weight      string  `json:"weight"`
+					Description string  `json:"description"`
+					IsActive    bool    `json:"is_active"`
+					CreatedAt   string  `json:"created_at"`
+					UserID      int64   `json:"user_id"`
+					Username    string  `json:"username"`
+				}
+				out := []PubExport{}
+				for rows.Next() {
+					var p PubExport
+					var ds, de sql.NullTime
+					var singleDate sql.NullTime
+					var createdAt time.Time
+					var tgUserID int64
+					if err := rows.Scan(&p.ID, &p.Kind, &p.From, &p.To, &ds, &de, &singleDate, &p.Item, &p.Weight, &p.Description, &p.IsActive, &createdAt, &tgUserID, &p.Username); err == nil {
+						if p.Kind == "trip" && singleDate.Valid {
+							dateStr := singleDate.Time.Format("2006-01-02")
+							p.Date = &dateStr
+						} else if ds.Valid && de.Valid {
+							dsStr := ds.Time.Format("2006-01-02")
+							deStr := de.Time.Format("2006-01-02")
+							p.DateStart = &dsStr
+							p.DateEnd = &deStr
+						}
+						p.CreatedAt = createdAt.Format(time.RFC3339)
+						p.UserID = tgUserID
+						out = append(out, p)
+					}
+				}
+				c.JSON(http.StatusOK, out)
+			}
+		} else {
+			// Экспорт сделок
+			qry := `
+				SELECT d.id, d.status, d.created_at, d.last_message_at,
+				       pr.id as request_pub_id, pr.from_iata as request_from, pr.to_iata as request_to,
+				       ur.tg_user_id as request_user_id, COALESCE(ur.tg_username, '') as request_username,
+				       pt.id as trip_pub_id, pt.from_iata as trip_from, pt.to_iata as trip_to,
+				       ut.tg_user_id as trip_user_id, COALESCE(ut.tg_username, '') as trip_username
+				FROM deal d
+				JOIN publication pr ON pr.id = d.request_pub_id
+				JOIN app_user ur ON ur.id = pr.user_id
+				JOIN publication pt ON pt.id = d.trip_pub_id
+				JOIN app_user ut ON ut.id = pt.user_id
+				WHERE 1=1`
+			args := []any{}
+
+			if status != "" {
+				qry += " AND d.status = $1::deal_status"
+				args = append(args, status)
+			}
+
+			qry += " ORDER BY d.created_at DESC LIMIT 10000"
+
+			rows, err := pool.Query(c, qry, args...)
+			if err != nil {
+				log.Printf("[ADMIN] Export deals error: %v", err)
+				c.JSON(http.StatusInternalServerError, gin.H{"error": "ошибка экспорта"})
+				return
+			}
+			defer rows.Close()
+
+			if format == "csv" {
+				c.Writer.WriteString("ID,Status,CreatedAt,RequestPubID,RequestFrom,RequestTo,RequestUserID,RequestUsername,TripPubID,TripFrom,TripTo,TripUserID,TripUsername\n")
+				for rows.Next() {
+					var id int64
+					var status, createdAt, reqFrom, reqTo, reqUsername, tripFrom, tripTo, tripUsername string
+					var reqPubID, tripPubID int64
+					var reqUserID, tripUserID int64
+					var lastMessageAt sql.NullTime
+					if err := rows.Scan(&id, &status, &createdAt, &lastMessageAt, &reqPubID, &reqFrom, &reqTo, &reqUserID, &reqUsername, &tripPubID, &tripFrom, &tripTo, &tripUserID, &tripUsername); err == nil {
+						c.Writer.WriteString(fmt.Sprintf("%d,%s,%s,%d,%s,%s,%d,%s,%d,%s,%s,%d,%s\n",
+							id, status, createdAt, reqPubID, reqFrom, reqTo, reqUserID, reqUsername,
+							tripPubID, tripFrom, tripTo, tripUserID, tripUsername))
+					}
+				}
+			} else {
+				type DealExport struct {
+					ID              int64  `json:"id"`
+					Status          string `json:"status"`
+					CreatedAt       string `json:"created_at"`
+					RequestPubID    int64  `json:"request_pub_id"`
+					RequestFrom     string `json:"request_from"`
+					RequestTo       string `json:"request_to"`
+					RequestUserID   int64  `json:"request_user_id"`
+					RequestUsername string `json:"request_username"`
+					TripPubID       int64  `json:"trip_pub_id"`
+					TripFrom        string `json:"trip_from"`
+					TripTo          string `json:"trip_to"`
+					TripUserID      int64  `json:"trip_user_id"`
+					TripUsername    string `json:"trip_username"`
+				}
+				out := []DealExport{}
+				for rows.Next() {
+					var d DealExport
+					var createdAt time.Time
+					var lastMessageAt sql.NullTime
+					if err := rows.Scan(&d.ID, &d.Status, &createdAt, &lastMessageAt, &d.RequestPubID, &d.RequestFrom, &d.RequestTo, &d.RequestUserID, &d.RequestUsername, &d.TripPubID, &d.TripFrom, &d.TripTo, &d.TripUserID, &d.TripUsername); err == nil {
+						d.CreatedAt = createdAt.Format(time.RFC3339)
+						out = append(out, d)
+					}
+				}
+				c.JSON(http.StatusOK, out)
+			}
+		}
+	}
+}
+
+// listAdminUsers возвращает список пользователей
+func listAdminUsers(pool *pgxpool.Pool) gin.HandlerFunc {
+	return func(c *gin.Context) {
+		username := c.Query("username")
+		tgUserIDStr := c.Query("tg_user_id")
+		limitStr := c.Query("limit")
+		offsetStr := c.Query("offset")
+		limit := 50
+		offset := 0
+		if limitStr != "" {
+			if l, err := strconv.Atoi(limitStr); err == nil && l > 0 && l <= 200 {
+				limit = l
+			}
+		}
+		if offsetStr != "" {
+			if o, err := strconv.Atoi(offsetStr); err == nil && o >= 0 {
+				offset = o
+			}
+		}
+
+		qry := `
+			SELECT u.id, u.tg_user_id, COALESCE(u.tg_username, '') as tg_username,
+			       COALESCE(u.rating_small, 0) as rating, u.is_blocked, u.created_at,
+			       COUNT(DISTINCT p.id) as publications_count,
+			       COUNT(DISTINCT d.id) as deals_count
+			FROM app_user u
+			LEFT JOIN publication p ON p.user_id = u.id
+			LEFT JOIN deal d ON (d.request_pub_id IN (SELECT id FROM publication WHERE user_id = u.id) 
+			                     OR d.trip_pub_id IN (SELECT id FROM publication WHERE user_id = u.id))
+			WHERE 1=1`
+		args := []any{}
+		argIdx := 1
+
+		if username != "" {
+			qry += fmt.Sprintf(" AND u.tg_username ILIKE $%d", argIdx)
+			args = append(args, "%"+username+"%")
+			argIdx++
+		}
+
+		if tgUserIDStr != "" {
+			if tgUserID, err := strconv.ParseInt(tgUserIDStr, 10, 64); err == nil {
+				qry += fmt.Sprintf(" AND u.tg_user_id = $%d", argIdx)
+				args = append(args, tgUserID)
+				argIdx++
+			}
+		}
+
+		qry += " GROUP BY u.id"
+		qry += " ORDER BY u.created_at DESC"
+		qry += fmt.Sprintf(" LIMIT $%d OFFSET $%d", argIdx, argIdx+1)
+		args = append(args, limit, offset)
+
+		rows, err := pool.Query(c, qry, args...)
+		if err != nil {
+			log.Printf("[ADMIN] List users error: %v", err)
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "ошибка базы данных"})
+			return
+		}
+		defer rows.Close()
+
+		type User struct {
+			ID                int64  `json:"id"`
+			TgUserID          int64  `json:"tg_user_id"`
+			TgUsername        string `json:"tg_username"`
+			Rating            int    `json:"rating"`
+			IsBlocked         bool   `json:"is_blocked"`
+			CreatedAt         string `json:"created_at"`
+			PublicationsCount int    `json:"publications_count"`
+			DealsCount        int    `json:"deals_count"`
+		}
+
+		out := []User{}
+		for rows.Next() {
+			var u User
+			var createdAt time.Time
+			if err := rows.Scan(&u.ID, &u.TgUserID, &u.TgUsername, &u.Rating, &u.IsBlocked, &createdAt, &u.PublicationsCount, &u.DealsCount); err != nil {
+				log.Printf("[ADMIN] Scan error: %v", err)
+				continue
+			}
+			u.CreatedAt = createdAt.Format(time.RFC3339)
+			out = append(out, u)
+		}
+
+		c.JSON(http.StatusOK, out)
+	}
+}
+
+// getAdminUser возвращает детали пользователя
+func getAdminUser(pool *pgxpool.Pool) gin.HandlerFunc {
+	return func(c *gin.Context) {
+		idStr := c.Param("id")
+		id, err := strconv.ParseInt(idStr, 10, 64)
+		if err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "неверный идентификатор"})
+			return
+		}
+
+		type UserDetail struct {
+			ID                int64                    `json:"id"`
+			TgUserID          int64                    `json:"tg_user_id"`
+			TgUsername        string                   `json:"tg_username"`
+			Rating            int                      `json:"rating"`
+			IsBlocked         bool                     `json:"is_blocked"`
+			CreatedAt         string                   `json:"created_at"`
+			Publications      []map[string]interface{} `json:"publications"`
+			Deals             []map[string]interface{} `json:"deals"`
+			PublicationsCount int                      `json:"publications_count"`
+			DealsCount        int                      `json:"deals_count"`
+		}
+
+		var u UserDetail
+		var createdAt time.Time
+		err = pool.QueryRow(c, `
+			SELECT id, tg_user_id, COALESCE(tg_username, ''), COALESCE(rating_small, 0), is_blocked, created_at
+			FROM app_user WHERE id = $1
+		`, id).Scan(&u.ID, &u.TgUserID, &u.TgUsername, &u.Rating, &u.IsBlocked, &createdAt)
+		if err != nil {
+			if errors.Is(err, pgx.ErrNoRows) {
+				c.JSON(http.StatusNotFound, gin.H{"error": "пользователь не найден"})
+				return
+			}
+			log.Printf("[ADMIN] Get user error: %v", err)
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "ошибка базы данных"})
+			return
+		}
+		u.CreatedAt = createdAt.Format(time.RFC3339)
+
+		// Загрузка публикаций пользователя
+		pubRows, err := pool.Query(c, `
+			SELECT id, kind, from_iata, to_iata, date_start, date_end, date, is_active, created_at
+			FROM publication WHERE user_id = $1 ORDER BY created_at DESC LIMIT 50
+		`, id)
+		if err == nil {
+			defer pubRows.Close()
+			for pubRows.Next() {
+				var pubID int64
+				var pubKind, pubFrom, pubTo string
+				var ds, de sql.NullTime
+				var singleDate sql.NullTime
+				var pubIsActive bool
+				var pubCreatedAt time.Time
+				if err := pubRows.Scan(&pubID, &pubKind, &pubFrom, &pubTo, &ds, &de, &singleDate, &pubIsActive, &pubCreatedAt); err == nil {
+					p := map[string]interface{}{
+						"id":         pubID,
+						"kind":       pubKind,
+						"from_iata":  pubFrom,
+						"to_iata":    pubTo,
+						"is_active":  pubIsActive,
+						"created_at": pubCreatedAt.Format(time.RFC3339),
+					}
+					if pubKind == "trip" && singleDate.Valid {
+						p["date"] = singleDate.Time.Format("2006-01-02")
+					} else if ds.Valid && de.Valid {
+						p["date_start"] = ds.Time.Format("2006-01-02")
+						p["date_end"] = de.Time.Format("2006-01-02")
+					}
+					u.Publications = append(u.Publications, p)
+				}
+			}
+		}
+
+		// Загрузка сделок пользователя
+		dealRows, err := pool.Query(c, `
+			SELECT d.id, d.status, d.request_pub_id, d.trip_pub_id, d.created_at
+			FROM deal d
+			JOIN publication pr ON pr.id = d.request_pub_id
+			JOIN publication pt ON pt.id = d.trip_pub_id
+			WHERE pr.user_id = $1 OR pt.user_id = $1
+			ORDER BY d.created_at DESC LIMIT 50
+		`, id)
+		if err == nil {
+			defer dealRows.Close()
+			for dealRows.Next() {
+				var dealID int64
+				var dealStatus string
+				var dealReqPubID, dealTripPubID int64
+				var dealCreatedAt time.Time
+				if err := dealRows.Scan(&dealID, &dealStatus, &dealReqPubID, &dealTripPubID, &dealCreatedAt); err == nil {
+					d := map[string]interface{}{
+						"id":             dealID,
+						"status":         dealStatus,
+						"request_pub_id": dealReqPubID,
+						"trip_pub_id":    dealTripPubID,
+						"created_at":     dealCreatedAt.Format(time.RFC3339),
+					}
+					u.Deals = append(u.Deals, d)
+				}
+			}
+		}
+
+		u.PublicationsCount = len(u.Publications)
+		u.DealsCount = len(u.Deals)
+
+		c.JSON(http.StatusOK, u)
+	}
+}
+
+// updateAdminUser обновляет пользователя (блокировка/разблокировка)
+func updateAdminUser(pool *pgxpool.Pool) gin.HandlerFunc {
+	return func(c *gin.Context) {
+		idStr := c.Param("id")
+		id, err := strconv.ParseInt(idStr, 10, 64)
+		if err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "неверный идентификатор"})
+			return
+		}
+
+		type UpdateUserIn struct {
+			IsBlocked *bool `json:"is_blocked,omitempty"`
+		}
+
+		var in UpdateUserIn
+		if err := c.ShouldBindJSON(&in); err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "неверный формат данных"})
+			return
+		}
+
+		if in.IsBlocked == nil {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "необходимо указать is_blocked"})
+			return
+		}
+
+		_, err = pool.Exec(c, `UPDATE app_user SET is_blocked = $1 WHERE id = $2`, *in.IsBlocked, id)
+		if err != nil {
+			log.Printf("[ADMIN] Update user error: %v", err)
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "ошибка обновления"})
+			return
+		}
+
+		c.JSON(http.StatusOK, gin.H{"ok": true})
 	}
 }
