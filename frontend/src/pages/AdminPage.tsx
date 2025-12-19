@@ -3,8 +3,8 @@ import AirportInput from "../components/AirportInput";
 import SEO from "../components/SEO";
 import { api, isAuthenticated } from "../lib/api";
 import { useNavigate } from "react-router-dom";
-import { HiOutlineCalendar, HiOutlineCube, HiOutlineExclamationCircle, HiOutlineUser, HiOutlineCheckCircle, HiOutlineXCircle, HiOutlineUserGroup } from "react-icons/hi";
-import { HiOutlineGift, HiOutlineTruck, HiOutlineViewGrid } from "react-icons/hi2";
+import { HiOutlineCalendar, HiOutlineCube, HiOutlineExclamationCircle, HiOutlineUser, HiOutlineCheckCircle, HiOutlineXCircle, HiOutlineUserGroup, HiOutlineCollection } from "react-icons/hi";
+import { HiOutlineGift, HiOutlineTruck } from "react-icons/hi2";
 
 type Tab = "create" | "publications" | "deals";
 
@@ -338,7 +338,7 @@ export default function AdminPage() {
                                 : "border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300"
                                 }`}
                         >
-                            <HiOutlineViewGrid className="w-5 h-5 inline mr-2" />
+                            <HiOutlineCollection className="w-5 h-5 inline mr-2" />
                             Публикации
                         </button>
                         <button
