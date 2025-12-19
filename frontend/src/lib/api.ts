@@ -52,7 +52,7 @@ async function handleResponse<T>(response: Response): Promise<T> {
   // Check content type before parsing
   const contentType = response.headers.get("content-type");
   const isJson = contentType && contentType.includes("application/json");
-  
+
   let data: any;
   if (isJson) {
     try {
@@ -101,7 +101,7 @@ async function handleResponse<T>(response: Response): Promise<T> {
       return {} as T;
     }
   }
-  
+
   if (!response.ok) {
     // Try to get user-friendly error message from JSON response
     const errorMsg = data?.error || `Ошибка ${response.status}`;
@@ -191,8 +191,8 @@ export const api = {
   },
 
   dealLink: async (id: number) => {
-    return apiCall(`${BASE}/deals/${id}/deep-link`, { 
-      headers: tgHeader() 
+    return apiCall(`${BASE}/deals/${id}/deep-link`, {
+      headers: tgHeader()
     });
   },
 
@@ -216,11 +216,55 @@ export const api = {
   createAdminPub: async (body: any): Promise<CreatePubResponse> => {
     return apiCall<CreatePubResponse>(`${BASE}/admin/publications`, {
       method: "POST",
-      headers: { 
-        "Content-Type": "application/json", 
-        ...tgHeader() 
+      headers: {
+        "Content-Type": "application/json",
+        ...tgHeader()
       },
       body: JSON.stringify(body),
     }, 15000);
+  },
+
+  listAdminPubs: async (params?: { kind?: string; from?: string; to?: string; is_active?: boolean; limit?: number }) => {
+    const searchParams = new URLSearchParams();
+    if (params?.kind) searchParams.append("kind", params.kind);
+    if (params?.from) searchParams.append("from", params.from);
+    if (params?.to) searchParams.append("to", params.to);
+    if (params?.is_active !== undefined) searchParams.append("is_active", params.is_active.toString());
+    if (params?.limit) searchParams.append("limit", params.limit.toString());
+    return apiCall(`${BASE}/admin/publications?${searchParams.toString()}`, {
+      headers: tgHeader()
+    }, 10000);
+  },
+
+  getAdminPub: async (id: number) => {
+    return apiCall(`${BASE}/admin/publications/${id}`, {
+      headers: tgHeader()
+    }, 8000);
+  },
+
+  createAdminDeal: async (request_pub_id: number, trip_pub_id: number) => {
+    return apiCall(`${BASE}/admin/deals`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        ...tgHeader()
+      },
+      body: JSON.stringify({ request_pub_id, trip_pub_id }),
+    }, 15000);
+  },
+
+  listAdminDeals: async (params?: { status?: string; limit?: number }) => {
+    const searchParams = new URLSearchParams();
+    if (params?.status) searchParams.append("status", params.status);
+    if (params?.limit) searchParams.append("limit", params.limit.toString());
+    return apiCall(`${BASE}/admin/deals?${searchParams.toString()}`, {
+      headers: tgHeader()
+    }, 10000);
+  },
+
+  getAdminMatches: async (pubId: number) => {
+    return apiCall(`${BASE}/admin/matches/${pubId}`, {
+      headers: tgHeader()
+    }, 10000);
   },
 };

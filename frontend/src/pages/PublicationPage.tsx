@@ -10,6 +10,7 @@ import {
   HiOutlineExclamationCircle,
   HiOutlineCheckCircle,
   HiOutlineArrowRight,
+  HiArrowRight,
   HiOutlineShare,
   HiOutlineChatAlt2,
 } from "react-icons/hi";
@@ -348,8 +349,8 @@ export default function PublicationPage() {
             {error && (
               <div
                 className={`mb-4 flex items-start gap-2 p-4 border rounded-lg ${error.includes("Контакты создателя") || error.includes("Создатель объявления получил")
-                    ? "bg-green-50 border-green-200"
-                    : "bg-red-50 border-red-200"
+                  ? "bg-green-50 border-green-200"
+                  : "bg-red-50 border-red-200"
                   }`}
               >
                 {error.includes("Контакты создателя") || error.includes("Создатель объявления получил") ? (
@@ -360,8 +361,8 @@ export default function PublicationPage() {
                 <div className="flex-1">
                   <p
                     className={`text-sm whitespace-pre-line ${error.includes("Контакты создателя") || error.includes("Создатель объявления получил")
-                        ? "text-green-700"
-                        : "text-red-700"
+                      ? "text-green-700"
+                      : "text-red-700"
                       }`}
                   >
                     {error}
