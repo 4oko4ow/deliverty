@@ -192,7 +192,7 @@ cd ops
 ./qa_test.sh
 ```
 
-Or run individual test commands manually - see `ops/qa_commands.md` for detailed curl commands and test cases.
+Or run individual test commands manually using `curl` against the endpoints listed above.
 
 ## Development Workflow
 
@@ -257,10 +257,6 @@ go run ./backend/cmd/airports-load \
   ./ops/airports.csv
 ```
 
-## MVP Checklist
-
-See `ops/MVP_CHECKLIST.md` for complete readiness checklist.
-
 ## License
 
-[Add your license here]
+MIT
